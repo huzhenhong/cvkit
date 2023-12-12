@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [
+                "-s",
+                "/Users/huzh/Documents/algorithm/物品搬移/video/good_move_test0.mp4",
+                "-m",
+                "/Users/huzh/Downloads/yolov8s.onnx",
+                "--debug",
+            ],
+            // 以上必须要有
+            "environment": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false, // 使用内部终端调试
+            "osx": {
+                "type": "lldb",
+                // "coreDumpPath": ""
+            },
+            "linux": {
+                "MIMode": "gdb",
+                // "coreDumpPath": ""·
+                "setupCommands": [
+                    {
+                        "text": "-enable-pretty-printing",
+                        "description": "enable pretty printing",
+                        "ignoreFailures": true
+                    },
+                ],
+            },
+            "windows": {
+                "type": "cppvsdbg",
+                "symbolSearchPath": "C:\\Symbols;C:\\SymbolDir2",
+                // "dumpPath": "",
+            }
+        }
+    ]
+}

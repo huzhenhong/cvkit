@@ -4,6 +4,14 @@ message("\n================= Start configure ${PROJECT_NAME} =================="
 
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
+if(NOT DEFINED MASTER_PROJECT)
+    if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        set(CVKIT_MASTER_PROJECT ON)
+    else()
+        set(CVKIT_MASTER_PROJECT OFF)
+    endif()
+endif()
+
 project(
     ${PROJECT_NAME}
     VERSION 1.0.0.0
@@ -11,7 +19,7 @@ project(
     DESCRIPTION "a cv commom library"
     HOMEPAGE_URL "project site")
 
-if(NOT DEFINED META_PROJECT)
+if(${CVKIT_MASTER_PROJECT})
     set(META_PROJECT ${PROJECT_NAME})
     message("config META_PROJECT ${PROJECT_NAME}")
 

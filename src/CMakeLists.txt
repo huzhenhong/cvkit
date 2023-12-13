@@ -54,9 +54,12 @@ target_include_directories(${Target} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/deploy)
 # "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/video>")
 
 target_link_libraries(${Target} PUBLIC # basekit::basekit
-                                       spdlog::spdlog ${OPENCV_NEED_LIBS} ${ZJ_HF_CODEC_NEED_LIBS})
+                                       spdlog::spdlog)
 
-set(ONNXRUNTIME_DIR /Users/huzh/Documents/deploy_backends/onnxruntime-osx-x86_64-1.16.1)
+if(NOT DEFINED ONNXRUNTIME_DIR)
+    set(ONNXRUNTIME_DIR /Users/huzh/Documents/deploy_backends/onnxruntime-osx-x86_64-1.16.1)
+endif()
+
 target_include_directories(${Target} PUBLIC ${ONNXRUNTIME_DIR}/include)
 if(LINUX)
     target_link_libraries(${Target} PUBLIC "${ONNXRUNTIME_DIR}/lib/libonnxruntime.so")

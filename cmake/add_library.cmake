@@ -15,6 +15,7 @@ function(add_opencv Target)
             message("opencv include dir : " ${OpenCV_INCLUDE_DIRS})
             message("opencv lib dir : " ${OpenCV_LIBRARY_DIRS})
 
+            cmake_policy(SET CMP0146 NEW)
             find_package(CUDA QUIET)
             if(CUDA_FOUND)
                 list(APPEND OPENCV_NEED_LIBS opencv_cudacodec)

@@ -10,9 +10,6 @@
  *************************************************************************************/
 #include "cmdline.h"
 #include "spdlog/spdlog.h"
-#include <fmt/core.h>
-#include <string>
-#include <unistd.h>
 #include "camera_wrapper.hpp"
 #include "yolov8/yolov8.h"
 #include "yolov8/yolov8_onnx.h"

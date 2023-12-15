@@ -234,8 +234,10 @@ void DrawPred(cv::Mat&                 img,
         putText(img, label, cv::Point(left, top), cv::FONT_HERSHEY_SIMPLEX, 1, color[result[i].id], 2);
     }
     addWeighted(img, 0.5, mask, 0.5, 0, img);  // add mask to src
-    imshow("1", img);
-    if (!isVideo)
+    if (isVideo)
+    {
+        imshow("1", img);
         cv::waitKey();
-    // destroyAllWindows();
+        // destroyAllWindows();
+    }
 }

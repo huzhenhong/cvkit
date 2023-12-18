@@ -33,19 +33,24 @@ namespace cvkit
     {
         while (m_bRun)
         {
-            // if (m_video.set(cv::CAP_PROP_POS_FRAMES, m_pos))
+            if (m_video.set(cv::CAP_PROP_POS_FRAMES, m_pos))
             {
-                cv::Mat frame;
-                if (m_video.read(frame) && (0 == m_pos % m_extractFrameInterval))
-                {
-                    m_cpuCallBack(frame, uint64_t(m_pos.load()));
-                }
-
                 ++m_pos;
+
+                if (m_video.grab())
+                {
+                    if (0 == m_pos % m_extractFrameInterval)
+                    {
+                        cv::Mat frame;
+
+                        if (m_video.retrieve(frame))
+                        {
+                            m_cpuCallBack(frame, uint64_t(m_pos.load()));
+                        }
+                    }
+                }
             }
 
-            // m_pos += 1;
-            // m_pos += m_extractFrameInterval;
             if (m_pos >= m_totalFrameNum)
             {
                 break;

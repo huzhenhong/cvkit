@@ -12,12 +12,11 @@
 #include "semaphore.hpp"
 #include "video.h"
 #include <atomic>
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <vector>
+#include <regex>
 
 #ifdef HAVE_OPENCV_HIGHGUI
     #include "opencv2/highgui/highgui.hpp"
@@ -68,13 +67,26 @@ namespace cvkit
         bool Execute()
         {
             auto ExitCallBack = [&]()
-            { m_bExit = true; };
+            {
+                m_bExit = true;
+                m_semaphore.Post();  // 唤醒主线程退出
+            };
 
             auto frameCallBack = [&](const ImgType& frame, uint64_t frameIdx)
             {
+                // auto pos = cv::getTrackbarPos("POS: ", m_wrapperParam.winname);
+                // cv::setTrackbarPos("POS: ", m_wrapperParam.winname, pos);
+                // fmt::print("pos: {}", pos);
+
+
                 if (m_wrapperParam.bAsync)
                 {
                     // 解码线程回调
+                    while (m_frameQue.size() > m_wrapperParam.cacheSize)
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+
                     {
                         std::lock_guard<std::mutex> lock(m_mtx);
                         m_frameQue.emplace(std::move(frame));
@@ -120,7 +132,9 @@ namespace cvkit
             else
             {
                 auto AtExitHandler = []()
-                { std::cout << "interrupt!\n"; };
+                {
+                    std::cout << "interrupt!\n";
+                };
 
                 std::atexit(AtExitHandler);
             }
@@ -164,9 +178,9 @@ namespace cvkit
                 return false;
             }
 
-#ifdef HAVE_OPENCV_HIGHGUI
-            cv::waitKey();
-#endif
+            // #ifdef HAVE_OPENCV_HIGHGUI
+            //             cv::waitKey();
+            // #endif
             if (m_wrapperParam.bAsync)
             {  // 主线程在这里阻塞
                 AsyncRun();
@@ -249,11 +263,12 @@ namespace cvkit
         {
             while (true)
             {
+                m_semaphore.Wait();  // 等待图片
+
                 ImgType frame;
 
                 if (!m_bExit)
                 {
-                    m_semaphore.Wait();  // 等待图片
                     {
                         std::lock_guard<std::mutex> lock(m_mtx);
                         frame = m_frameQue.front();
@@ -268,6 +283,10 @@ namespace cvkit
                     {
                         frame = m_frameQue.front();
                         m_frameQue.pop();
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
 

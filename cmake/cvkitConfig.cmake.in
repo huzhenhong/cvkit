@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(basekit REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/cvkitTargets.cmake")

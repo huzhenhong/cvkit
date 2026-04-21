@@ -1,0 +1,11 @@
+Checks: >-
+  bugprone-*,
+  performance-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  readability-redundant-control-flow,
+  -bugprone-easily-swappable-parameters,
+  -modernize-use-trailing-return-type
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(\/workspace\/cvkit\/)?(include|src|examples|tests|benchmark|test_package)\/'
+FormatStyle: none

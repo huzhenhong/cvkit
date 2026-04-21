@@ -1,0 +1,27 @@
+CompileFlags:
+  CompilationDatabase: build
+  Compiler: /usr/bin/c++
+  BuiltinHeaders: QueryDriver
+  Add:
+    - -std=c++17
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: None
+  ClangTidy:
+    FastCheckFilter: Strict
+
+---
+If:
+  PathMatch: .*\.h
+CompileFlags:
+  Add:
+    - -xc++
+    - -std=c++17
+
+---
+If:
+  PathMatch: (include|src|examples|tests|benchmark|test_package)/.*
+Diagnostics:
+  Suppress:
+    - builtin_definition

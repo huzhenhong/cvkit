@@ -2,6 +2,18 @@ include(GenerateExportHeader)
 
 add_library(cvkit_infer
     model.cpp
+    session.cpp
+    registry.cpp
+    backends/onnxruntime/ort_session.cpp
+    backends/tensorrt/trt_session.cpp
+    tasks/detection/detection_pipeline.cpp
+    tasks/detection/yolo/yolo_preprocess_cpu.cpp
+    tasks/detection/yolo/yolo_postprocess.cpp
+    tasks/promptable_segmentation/promptable_segmentation_pipeline.cpp
+    utils/labels.cpp
+    utils/nms.cpp
+    utils/bbox.cpp
+    utils/tensor_layout.cpp
 )
 
 add_library(cvkit::infer ALIAS cvkit_infer)
@@ -43,6 +55,8 @@ endif()
 
 if(CVKIT_ENABLE_TENSORRT)
     target_compile_definitions(cvkit_infer PRIVATE CVKIT_WITH_TENSORRT=1)
+    target_include_directories(cvkit_infer PRIVATE ${CVKIT_TENSORRT_INCLUDE_DIR})
+    target_link_libraries(cvkit_infer PRIVATE CUDA::cudart ${CVKIT_TENSORRT_NVINFER_LIBRARY} ${CVKIT_TENSORRT_NVONNXPARSER_LIBRARY})
 endif()
 
 set_target_properties(cvkit_infer PROPERTIES
@@ -65,8 +79,10 @@ install(
 )
 
 install(
-    FILES
-        ${PROJECT_SOURCE_DIR}/include/cvkit/infer/model.h
-        ${CMAKE_CURRENT_BINARY_DIR}/generated/cvkit/infer/infer_export.h
+    DIRECTORY
+        ${PROJECT_SOURCE_DIR}/include/cvkit/infer/
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/cvkit/infer/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cvkit/infer
+    FILES_MATCHING
+        PATTERN "*.h"
 )

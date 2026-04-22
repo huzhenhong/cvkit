@@ -11,6 +11,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(CTest)
 include(CheckLanguage)
+include(FindPackageHandleStandardArgs)
 
 option(BUILD_SHARED_LIBS "Build shared libraries by default" ON)
 option(CVKIT_BUILD_EXAMPLES "Build local usage examples" OFF)
@@ -95,7 +96,62 @@ if(CVKIT_ENABLE_OPENVINO)
 endif()
 
 if(CVKIT_ENABLE_TENSORRT)
-    message(FATAL_ERROR "CVKIT_ENABLE_TENSORRT=ON is not implemented yet")
+    if(NOT CUDAToolkit_FOUND)
+        if(CVKIT_CUDATOOLKIT_ROOT)
+            set(CUDAToolkit_ROOT "${CVKIT_CUDATOOLKIT_ROOT}")
+        elseif(EXISTS "${CVKIT_CUDART_LIBRARY}")
+            get_filename_component(_cvkit_cudart_libdir "${CVKIT_CUDART_LIBRARY}" DIRECTORY)
+            get_filename_component(_cvkit_cuda_target_root "${_cvkit_cudart_libdir}" DIRECTORY)
+            get_filename_component(_cvkit_cuda_targets_dir "${_cvkit_cuda_target_root}" DIRECTORY)
+            get_filename_component(CUDAToolkit_ROOT "${_cvkit_cuda_targets_dir}" DIRECTORY)
+        endif()
+        find_package(CUDAToolkit REQUIRED)
+    endif()
+    find_path(
+        CVKIT_TENSORRT_INCLUDE_DIR
+        NAMES NvInfer.h
+        HINTS
+            ${CVKIT_TENSORRT_PREFIX}
+            /usr
+            /usr/local
+        PATH_SUFFIXES
+            include
+            include/x86_64-linux-gnu
+            x86_64-linux-gnu
+    )
+    find_library(
+        CVKIT_TENSORRT_NVINFER_LIBRARY
+        NAMES nvinfer
+        HINTS
+            ${CVKIT_TENSORRT_PREFIX}
+            /usr
+            /usr/local
+        PATH_SUFFIXES
+            lib
+            lib64
+            lib/x86_64-linux-gnu
+            x86_64-linux-gnu
+    )
+    find_library(
+        CVKIT_TENSORRT_NVONNXPARSER_LIBRARY
+        NAMES nvonnxparser
+        HINTS
+            ${CVKIT_TENSORRT_PREFIX}
+            /usr
+            /usr/local
+        PATH_SUFFIXES
+            lib
+            lib64
+            lib/x86_64-linux-gnu
+            x86_64-linux-gnu
+    )
+    find_package_handle_standard_args(
+        TensorRT
+        REQUIRED_VARS
+            CVKIT_TENSORRT_INCLUDE_DIR
+            CVKIT_TENSORRT_NVINFER_LIBRARY
+            CVKIT_TENSORRT_NVONNXPARSER_LIBRARY
+    )
 endif()
 
 add_subdirectory(src/core)

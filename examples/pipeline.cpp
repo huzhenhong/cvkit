@@ -6,6 +6,24 @@
 #include <iostream>
 #include <string>
 
+namespace
+{
+
+    [[nodiscard]] cvkit::infer::Backend parse_infer_backend(std::string_view value)
+    {
+        if (value == "tensorrt")
+        {
+            return cvkit::infer::Backend::tensorrt;
+        }
+        if (value == "onnxruntime")
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+        return cvkit::infer::Backend::none;
+    }
+
+}  // namespace
+
 int main(int argc, char** argv)
 {
     const auto  source_root        = std::filesystem::path(__FILE__).parent_path().parent_path();
@@ -20,6 +38,7 @@ int main(int argc, char** argv)
     std::string output_dir           = default_output_dir.string();
     std::string reader_backend       = "opencv";
     std::string writer_backend       = "opencv";
+    std::string infer_backend        = "onnxruntime";
     std::string gst_codec            = "jpegavi";
     float       confidence_threshold = 0.25F;
     float       iou_threshold        = 0.45F;
@@ -33,6 +52,7 @@ int main(int argc, char** argv)
     app.add_option("--output-dir", output_dir, "Directory for annotated outputs");
     app.add_option("--reader", reader_backend, "Reader backend: opencv, gstreamer, ffmpeg");
     app.add_option("--writer", writer_backend, "Writer backend: opencv, gstreamer, ffmpeg");
+    app.add_option("--infer-backend", infer_backend, "Inference backend: onnxruntime, tensorrt");
     app.add_option("--gst-codec", gst_codec, "GStreamer writer codec: jpegavi, x264mp4, nvh264, nvv4l2h264");
     app.add_option("--conf", confidence_threshold, "Confidence threshold")->check(CLI::Range(0.0, 1.0));
     app.add_option("--iou", iou_threshold, "NMS IoU threshold")->check(CLI::Range(0.0, 1.0));
@@ -55,9 +75,16 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!model.load(model_path))
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path  = model_path;
+    spec.labels_path = labels_path;
+    spec.backend     = parse_infer_backend(infer_backend);
+    spec.task        = cvkit::infer::TaskKind::detection;
+    spec.family      = "yolo11";
+
+    if (!model.load(spec))
     {
-        std::cerr << "model not loaded: " << model_path << '\n';
+        std::cerr << "model not loaded: " << model_path << " backend=" << infer_backend << '\n';
         return 1;
     }
 

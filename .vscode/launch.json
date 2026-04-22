@@ -21,6 +21,36 @@
           "ignoreFailures": true
         }
       ]
+    },
+    {
+      "name": "Debug cvkit pipeline (image)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/conan/Release/examples/bin/cvkit_example_pipeline",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--model",
+        "${workspaceFolder}/assets/models/yolo11n.onnx",
+        "--labels",
+        "${workspaceFolder}/assets/labels/coco80.txt",
+        "--image",
+        "${workspaceFolder}/assets/images/test_001.jpg",
+        "--output-dir",
+        "${workspaceFolder}/assets/output"
+      ],
+      "stopAtEntry": false,
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "CMake: build",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
     }
   ]
 }

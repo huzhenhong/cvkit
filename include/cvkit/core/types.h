@@ -40,6 +40,12 @@ namespace cvkit::core
         float height{0.0F};
     };
 
+    struct BK_CORE_EXPORT Point2f
+    {
+        float x{0.0F};
+        float y{0.0F};
+    };
+
     struct BK_CORE_EXPORT Detection
     {
         BBox        box{};

@@ -11,7 +11,9 @@
   //   "BASEKIT_BUILD_EXAMPLES": "ON"
   // },
   "cmake.configureArgs": [
-    "-DCVKIT_BUILD_EXAMPLES=ON"
+    "-DCVKIT_BUILD_EXAMPLES=ON",
+    "-DCVKIT_BUILD_TESTS=ON",
+    "-DCVKIT_BUILD_BENCHMARKS=OFF"
   ],
   "clangd.arguments": [
     "--background-index",

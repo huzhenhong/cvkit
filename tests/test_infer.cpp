@@ -3,6 +3,9 @@
 
 #include "cvkit/infer/model.h"
 
+#include <opencv2/imgcodecs.hpp>
+
+#include <cstdlib>
 #include <filesystem>
 
 TEST_CASE("model load fails for missing onnx file")
@@ -34,3 +37,48 @@ TEST_CASE("model exposes configurable yolo thresholds")
     CHECK(model.confidence_threshold() == Catch::Approx(0.6F));
     CHECK(model.iou_threshold() == Catch::Approx(0.3F));
 }
+
+#if defined(CVKIT_WITH_TENSORRT)
+TEST_CASE("tensorrt backend loads yolo11 model and returns detections for sample image")
+{
+    if (std::getenv("CVKIT_RUN_TENSORRT_SMOKE") == nullptr)
+    {
+        SKIP("set CVKIT_RUN_TENSORRT_SMOKE=1 to enable the long-running TensorRT smoke test");
+    }
+
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto model_path  = source_root / "assets" / "models" / "yolo11n.onnx";
+    const auto labels_path = source_root / "assets" / "labels" / "coco80.txt";
+    const auto image_path  = source_root / "assets" / "images" / "test_001.jpg";
+
+    REQUIRE(std::filesystem::exists(model_path));
+    REQUIRE(std::filesystem::exists(labels_path));
+    REQUIRE(std::filesystem::exists(image_path));
+
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path  = model_path.string();
+    spec.labels_path = labels_path.string();
+    spec.backend     = cvkit::infer::Backend::tensorrt;
+    spec.task        = cvkit::infer::TaskKind::detection;
+    spec.family      = "yolo11";
+
+    cvkit::infer::Model model;
+    REQUIRE(model.load(spec));
+    REQUIRE(model.loaded());
+    REQUIRE(model.backend() == cvkit::infer::Backend::tensorrt);
+
+    const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
+    REQUIRE_FALSE(image.empty());
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
+    frame.desc.channels = image.channels();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
+    frame.data.assign(image.data, image.data + image.total() * image.elemSize());
+
+    const auto detections = model.run_detection(frame);
+    CHECK_FALSE(detections.empty());
+}
+#endif

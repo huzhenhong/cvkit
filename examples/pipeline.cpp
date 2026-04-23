@@ -22,6 +22,23 @@ namespace
         return cvkit::infer::Backend::none;
     }
 
+    [[nodiscard]] cvkit::infer::CachePolicy parse_cache_policy(std::string_view value)
+    {
+        if (value == "disabled")
+        {
+            return cvkit::infer::CachePolicy::disabled;
+        }
+        if (value == "read-only")
+        {
+            return cvkit::infer::CachePolicy::read_only;
+        }
+        if (value == "rebuild")
+        {
+            return cvkit::infer::CachePolicy::rebuild;
+        }
+        return cvkit::infer::CachePolicy::default_policy;
+    }
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -39,7 +56,10 @@ int main(int argc, char** argv)
     std::string reader_backend       = "opencv";
     std::string writer_backend       = "opencv";
     std::string infer_backend        = "onnxruntime";
+    std::string cache_policy         = "default";
+    std::string cache_dir{};
     std::string gst_codec            = "jpegavi";
+    bool        async_infer          = false;
     float       confidence_threshold = 0.25F;
     float       iou_threshold        = 0.45F;
     std::size_t max_frames           = 0;
@@ -53,7 +73,10 @@ int main(int argc, char** argv)
     app.add_option("--reader", reader_backend, "Reader backend: opencv, gstreamer, ffmpeg");
     app.add_option("--writer", writer_backend, "Writer backend: opencv, gstreamer, ffmpeg");
     app.add_option("--infer-backend", infer_backend, "Inference backend: onnxruntime, tensorrt");
+    app.add_option("--cache-policy", cache_policy, "Model cache policy: default, disabled, read-only, rebuild");
+    app.add_option("--cache-dir", cache_dir, "Optional model cache directory");
     app.add_option("--gst-codec", gst_codec, "GStreamer writer codec: jpegavi, x264mp4, nvh264, nvv4l2h264");
+    app.add_flag("--async", async_infer, "Run inference through the async submit() path");
     app.add_option("--conf", confidence_threshold, "Confidence threshold")->check(CLI::Range(0.0, 1.0));
     app.add_option("--iou", iou_threshold, "NMS IoU threshold")->check(CLI::Range(0.0, 1.0));
     app.add_option("--max-frames", max_frames, "Limit processed video frames, 0 means all frames");
@@ -80,6 +103,8 @@ int main(int argc, char** argv)
     spec.labels_path = labels_path;
     spec.backend     = parse_infer_backend(infer_backend);
     spec.task        = cvkit::infer::TaskKind::detection;
+    spec.cache_policy = parse_cache_policy(cache_policy);
+    spec.cache_dir    = cache_dir;
     spec.family      = "yolo11";
 
     if (!model.load(spec))
@@ -94,7 +119,8 @@ int main(int argc, char** argv)
             model,
             image_path,
             output_dir,
-            cvkit::examples::parse_reader_backend(reader_backend));
+            cvkit::examples::parse_reader_backend(reader_backend),
+            async_infer);
     }
 
     if (!video_path.empty())
@@ -106,7 +132,8 @@ int main(int argc, char** argv)
             max_frames,
             cvkit::examples::parse_reader_backend(reader_backend),
             cvkit::examples::parse_writer_backend(writer_backend),
-            cvkit::examples::parse_gst_codec(gst_codec));
+            cvkit::examples::parse_gst_codec(gst_codec),
+            async_infer);
     }
 
     std::cerr << "either --image or --video is required\n";

@@ -47,7 +47,6 @@ app
 
 - FFmpeg backend
 - OpenVINO backend
-- TensorRT backend
 
 ## 构建开关
 
@@ -191,15 +190,29 @@ ENABLE_GSTREAMER_CUDA=ON BUILD_BENCHMARKS=OFF ./scripts/dev_build.sh
 - `--output-dir`
 - `--reader opencv|gstreamer|ffmpeg`
 - `--writer opencv|gstreamer|ffmpeg`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
 - `--gst-codec jpegavi|x264mp4|nvh264|nvv4l2h264`
 - `--conf`
 - `--iou`
 - `--max-frames`
 
+TensorRT cache 规则：
+
+- 默认 cache 根目录：
+  - `assets/models/.cvkit_cache/tensorrt/`
+- 默认策略：
+  - `default`
+- cache 文件命名：
+  - 模型指纹 + 运行时指纹
+- 旧的 `*.trt.plan` 仍然兼容，命中后会尽量迁移到新的 cache 布局
+
 图片推理示例：
 
 ```bash
 /workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend onnxruntime \
   --image /workspace/cvkit/assets/images/test_001.jpg \
   --output-dir /workspace/cvkit/assets/output
 ```
@@ -210,10 +223,24 @@ GStreamer 视频读写加 H.264 MP4 输出示例：
 /workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
   --reader gstreamer \
   --writer gstreamer \
+  --infer-backend onnxruntime \
   --gst-codec x264mp4 \
   --video /workspace/cvkit/assets/video/test.mp4 \
   --output-dir /workspace/cvkit/assets/output \
   --max-frames 30
+```
+
+带显式 cache 控制的 TensorRT 示例：
+
+```bash
+/workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend tensorrt \
+  --cache-policy rebuild \
+  --cache-dir /workspace/cvkit/assets/cache/trt \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --model /workspace/cvkit/assets/models/yolo11n.onnx \
+  --labels /workspace/cvkit/assets/labels/coco80.txt \
+  --output-dir /workspace/cvkit/assets/output
 ```
 
 当前工作区里已经生成过的验证输出：
@@ -233,13 +260,15 @@ GStreamer 视频读写加 H.264 MP4 输出示例：
 - GStreamer 视频读取正常
 - GStreamer `jpegavi` 和 `x264mp4` 写出链路正常
 - `CVKIT_ENABLE_GSTREAMER_CUDA=ON` 的 configure / build 路径已经验证
+- TensorRT backend 的 load/run/cache 链路已经在第 7 张卡上验证通过
+- TensorRT serialized engine cache 已支持指纹命名和旧 cache 迁移
 
 尚未定稿：
 
 - FFmpeg backend
 - OpenVINO backend
-- TensorRT backend
 - 从 example 支持层抽离成正式生产级 writer 抽象
+- 超出当前同步 `submit()` 包装之外的真实异步推理执行
 
 ## CI 入口
 

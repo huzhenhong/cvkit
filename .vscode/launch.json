@@ -31,6 +31,8 @@
       "args": [
         "--model",
         "${workspaceFolder}/assets/models/yolo11n.onnx",
+        "--infer-backend",
+        "tensorrt",
         "--labels",
         "${workspaceFolder}/assets/labels/coco80.txt",
         "--image",

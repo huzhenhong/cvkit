@@ -37,6 +37,29 @@ namespace cvkit::examples
             return frame;
         }
 
+        [[nodiscard]] std::vector<cvkit::core::Detection> infer_detections(
+            cvkit::infer::Model& model,
+            const cvkit::core::Frame& frame,
+            bool async_infer)
+        {
+            if (!async_infer)
+            {
+                return model.run(frame);
+            }
+
+            cvkit::infer::TaskInput input{};
+            input.add("image", frame);
+            auto future = model.submit(input);
+            const auto output = future.get();
+            if (const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+                detections != nullptr)
+            {
+                return *detections;
+            }
+
+            return {};
+        }
+
         [[nodiscard]] std::string escape_path_for_gstreamer(const std::filesystem::path& path)
         {
             auto        location = std::filesystem::absolute(path).string();
@@ -205,7 +228,8 @@ namespace cvkit::examples
         cvkit::infer::Model&         model,
         const std::filesystem::path& image_path,
         const std::filesystem::path& output_dir,
-        cvkit::media::ReaderBackend  reader_backend)
+        cvkit::media::ReaderBackend  reader_backend,
+        bool                         async_infer)
     {
         cv::Mat image;
         if (reader_backend == cvkit::media::ReaderBackend::gstreamer)
@@ -245,7 +269,7 @@ namespace cvkit::examples
             return 1;
         }
 
-        auto detections = model.run(mat_to_frame(image, image_path.string()));
+        auto detections = infer_detections(model, mat_to_frame(image, image_path.string()), async_infer);
         draw_detections(image, detections);
 
         const auto output_root = ensure_output_dir(output_dir);
@@ -258,6 +282,7 @@ namespace cvkit::examples
 
         std::cout
             << "image=" << image_path
+            << " async=" << (async_infer ? "true" : "false")
             << " detections=" << detections.size()
             << " output=" << output_path
             << '\n';
@@ -271,7 +296,8 @@ namespace cvkit::examples
         std::size_t                  max_frames,
         cvkit::media::ReaderBackend  reader_backend,
         cvkit::media::WriterBackend  writer_backend,
-        cvkit::media::GstVideoCodec  gst_codec)
+        cvkit::media::GstVideoCodec  gst_codec,
+        bool                         async_infer)
     {
         if (writer_backend == cvkit::media::WriterBackend::ffmpeg)
         {
@@ -362,7 +388,7 @@ namespace cvkit::examples
         bool        has_frame        = !frame.empty();
         do
         {
-            auto detections = model.run(mat_to_frame(frame, video_path.string()));
+            auto detections = infer_detections(model, mat_to_frame(frame, video_path.string()), async_infer);
             total_detections += detections.size();
             draw_detections(frame, detections);
             writer.write(frame);
@@ -377,6 +403,7 @@ namespace cvkit::examples
 
         std::cout
             << "video=" << video_path
+            << " async=" << (async_infer ? "true" : "false")
             << " frames=" << frame_index
             << " detections=" << total_detections
             << " output=" << output_path

@@ -1,10 +1,10 @@
 #include "cvkit/infer/model.h"
 
+#include "executor.h"
 #include "backends/backend_session.h"
 #include "tasks/task_pipeline.h"
 #include "utils/labels.h"
 
-#include <future>
 #include <memory>
 #include <string>
 #include <utility>
@@ -17,8 +17,9 @@ namespace cvkit::infer
     {
       public:
         ModelSpec                               spec_{};
-        std::unique_ptr<detail::IBackendSession> backend_{};
-        std::unique_ptr<detail::ITaskPipeline>   pipeline_{};
+        std::shared_ptr<detail::IBackendSession> backend_{};
+        std::shared_ptr<detail::ITaskPipeline>   pipeline_{};
+        std::shared_ptr<detail::IExecutor>       executor_{detail::create_default_executor()};
         std::vector<std::string>                 labels_{};
         float                                    confidence_threshold_{0.25F};
         float                                    iou_threshold_{0.45F};
@@ -91,18 +92,18 @@ namespace cvkit::infer
     Model::Model(Model&&) noexcept            = default;
     Model& Model::operator=(Model&&) noexcept = default;
 
-    bool Model::load(const ModelSpec& spec)
+    bool   Model::load(const ModelSpec& spec)
     {
-        impl_->loaded_  = false;
+        impl_->loaded_ = false;
         impl_->backend_.reset();
         impl_->pipeline_.reset();
         impl_->labels_.clear();
 
-        auto normalized      = spec;
-        normalized.backend   = normalize_backend(spec.backend);
-        normalized.task      = normalize_task(spec.task);
-        normalized.family    = normalize_family(normalized.task, spec.family);
-        impl_->spec_         = normalized;
+        auto normalized    = spec;
+        normalized.backend = normalize_backend(spec.backend);
+        normalized.task    = normalize_task(spec.task);
+        normalized.family  = normalize_family(normalized.task, spec.family);
+        impl_->spec_       = normalized;
 
         auto backend = detail::create_backend_session(normalized.backend);
         if (backend == nullptr || !backend->load(normalized) || !backend->ready())
@@ -116,8 +117,8 @@ namespace cvkit::infer
             return false;
         }
 
-        impl_->backend_  = std::move(backend);
-        impl_->pipeline_ = std::move(pipeline);
+        impl_->backend_  = std::shared_ptr<detail::IBackendSession>(std::move(backend));
+        impl_->pipeline_ = std::shared_ptr<detail::ITaskPipeline>(std::move(pipeline));
         impl_->loaded_   = true;
 
         if (!normalized.labels_path.empty())
@@ -218,7 +219,27 @@ namespace cvkit::infer
 
     TaskFuture Model::submit(const TaskInput& input) const
     {
-        return make_ready_future(run_sync(input));
+        if (!impl_->loaded_ || impl_->backend_ == nullptr || impl_->pipeline_ == nullptr)
+        {
+            return make_ready_future({});
+        }
+
+        auto backend = impl_->backend_;
+        auto pipeline = impl_->pipeline_;
+        auto copied_input = input;
+        detail::PipelineContext context{
+            impl_->labels_,
+            impl_->confidence_threshold_,
+            impl_->iou_threshold_};
+
+        return impl_->executor_->submit(
+            [backend = std::move(backend),
+             pipeline = std::move(pipeline),
+             input = std::move(copied_input),
+             context = std::move(context)]() mutable
+            {
+                return pipeline->run_sync(*backend, input, context);
+            });
     }
 
     std::vector<cvkit::core::Detection> Model::run_detection(const cvkit::core::Frame& frame) const

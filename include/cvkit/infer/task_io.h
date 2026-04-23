@@ -4,6 +4,7 @@
 #include "cvkit/infer/infer_export.h"
 
 #include <future>
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -91,6 +92,18 @@ namespace cvkit::infer
         TaskOutput get()
         {
             return future_.get();
+        }
+
+        template <typename Rep, typename Period>
+        [[nodiscard]] std::future_status wait_for(const std::chrono::duration<Rep, Period>& timeout) const
+        {
+            return future_.wait_for(timeout);
+        }
+
+        [[nodiscard]] bool is_ready() const
+        {
+            return future_.valid() &&
+                   future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
         }
 
       private:

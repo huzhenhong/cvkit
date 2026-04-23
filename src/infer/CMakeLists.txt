@@ -1,6 +1,7 @@
 include(GenerateExportHeader)
 
 add_library(cvkit_infer
+    executor.cpp
     model.cpp
     session.cpp
     registry.cpp

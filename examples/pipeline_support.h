@@ -17,7 +17,8 @@ namespace cvkit::examples
         cvkit::infer::Model&         model,
         const std::filesystem::path& image_path,
         const std::filesystem::path& output_dir,
-        cvkit::media::ReaderBackend  reader_backend);
+        cvkit::media::ReaderBackend  reader_backend,
+        bool                         async_infer);
 
     int run_video(
         cvkit::infer::Model&         model,
@@ -26,6 +27,7 @@ namespace cvkit::examples
         std::size_t                  max_frames,
         cvkit::media::ReaderBackend  reader_backend,
         cvkit::media::WriterBackend  writer_backend,
-        cvkit::media::GstVideoCodec  gst_codec);
+        cvkit::media::GstVideoCodec  gst_codec,
+        bool                         async_infer);
 
 }  // namespace cvkit::examples

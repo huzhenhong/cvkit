@@ -47,7 +47,6 @@ Reserved but not implemented yet:
 
 - FFmpeg backend
 - OpenVINO backend
-- TensorRT backend
 
 ## Build Options
 
@@ -191,15 +190,29 @@ Supported CLI options:
 - `--output-dir`
 - `--reader opencv|gstreamer|ffmpeg`
 - `--writer opencv|gstreamer|ffmpeg`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
 - `--gst-codec jpegavi|x264mp4|nvh264|nvv4l2h264`
 - `--conf`
 - `--iou`
 - `--max-frames`
 
+TensorRT cache behavior:
+
+- default cache root:
+  - `assets/models/.cvkit_cache/tensorrt/`
+- default policy:
+  - `default`
+- cache file naming:
+  - model fingerprint + runtime fingerprint
+- legacy `*.trt.plan` files are still accepted and migrated to the new cache layout when possible
+
 Image run:
 
 ```bash
 /workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend onnxruntime \
   --image /workspace/cvkit/assets/images/test_001.jpg \
   --output-dir /workspace/cvkit/assets/output
 ```
@@ -210,10 +223,24 @@ Video run with GStreamer H.264 MP4 output:
 /workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
   --reader gstreamer \
   --writer gstreamer \
+  --infer-backend onnxruntime \
   --gst-codec x264mp4 \
   --video /workspace/cvkit/assets/video/test.mp4 \
   --output-dir /workspace/cvkit/assets/output \
   --max-frames 30
+```
+
+TensorRT run with explicit cache control:
+
+```bash
+/workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend tensorrt \
+  --cache-policy rebuild \
+  --cache-dir /workspace/cvkit/assets/cache/trt \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --model /workspace/cvkit/assets/models/yolo11n.onnx \
+  --labels /workspace/cvkit/assets/labels/coco80.txt \
+  --output-dir /workspace/cvkit/assets/output
 ```
 
 Validated output examples already in the workspace:
@@ -233,13 +260,15 @@ Verified locally:
 - GStreamer video read path works
 - GStreamer `jpegavi` and `x264mp4` write paths work
 - `CVKIT_ENABLE_GSTREAMER_CUDA=ON` configure/build path has been validated
+- TensorRT backend load/run/cache path has been validated on GPU 7
+- TensorRT serialized engine cache supports fingerprinted cache files and legacy cache migration
 
 Not yet finalized:
 
 - FFmpeg backend
 - OpenVINO backend
-- TensorRT backend
 - production-grade video writer abstraction outside the example support layer
+- true asynchronous infer execution beyond the current synchronous `submit()` wrapper
 
 ## CI Entrypoints
 

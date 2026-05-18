@@ -1,9 +1,11 @@
+#include "cvkit/infer/tasks/classification.h"
 #include "cvkit/infer/tasks/detection.h"
 #include "cvkit/infer/tasks/promptable_segmentation.h"
 
 #include "backends/backend_session.h"
 #include "backends/onnxruntime/ort_session.h"
 #include "backends/tensorrt/trt_session.h"
+#include "tasks/classification/classification_pipeline.h"
 #include "tasks/detection/detection_pipeline.h"
 #include "tasks/promptable_segmentation/promptable_segmentation_pipeline.h"
 
@@ -17,8 +19,19 @@ namespace cvkit::infer
     {
         return TaskSchema{
             TaskKind::detection,
-            {IOField{"image", ValueKind::frame, false}},
+            {IOField{"image", ValueKind::image, false}},
             {IOField{"detections", ValueKind::detections, false}}};
+    }
+
+    TaskSchema classification_schema()
+    {
+        return TaskSchema{
+            TaskKind::classification,
+            {IOField{"image", ValueKind::image, false}},
+            {
+                IOField{"classification", ValueKind::classification, false},
+                IOField{"scores", ValueKind::floats, true},
+            }};
     }
 
     TaskSchema promptable_segmentation_schema()
@@ -26,11 +39,18 @@ namespace cvkit::infer
         return TaskSchema{
             TaskKind::promptable_segmentation,
             {
-                IOField{"image", ValueKind::frame, false},
+                IOField{"image", ValueKind::image, false},
+                IOField{"image_embeddings", ValueKind::tensor, true},
                 IOField{"points", ValueKind::points2f, true},
+                IOField{"point_labels", ValueKind::floats, true},
+                IOField{"box", ValueKind::bbox, true},
                 IOField{"prompt", ValueKind::text, true},
             },
             {
+                IOField{"image_embeddings", ValueKind::tensor, true},
+                IOField{"mask", ValueKind::mask, true},
+                IOField{"low_res_masks", ValueKind::tensor, true},
+                IOField{"logits", ValueKind::tensor, true},
                 IOField{"scores", ValueKind::floats, true},
             }};
     }
@@ -61,6 +81,8 @@ namespace cvkit::infer::detail
         {
             case TaskKind::detection:
                 return std::make_unique<DetectionPipeline>();
+            case TaskKind::classification:
+                return std::make_unique<ClassificationPipeline>();
             case TaskKind::promptable_segmentation:
                 return std::make_unique<PromptableSegmentationPipeline>();
             case TaskKind::unknown:

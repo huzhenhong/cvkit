@@ -2,10 +2,12 @@
 
 #include "executor.h"
 #include "backends/backend_session.h"
+#include "graph/graph.h"
 #include "tasks/task_pipeline.h"
 #include "utils/labels.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,10 +18,17 @@ namespace cvkit::infer
     class Model::Impl
     {
       public:
+        struct TraceState
+        {
+            std::mutex                  mutex{};
+            std::vector<GraphTraceInfo> last_trace{};
+        };
+
         ModelSpec                               spec_{};
         std::shared_ptr<detail::IBackendSession> backend_{};
         std::shared_ptr<detail::ITaskPipeline>   pipeline_{};
         std::shared_ptr<detail::IExecutor>       executor_{detail::create_default_executor()};
+        std::shared_ptr<TraceState>              trace_state_{std::make_shared<TraceState>()};
         std::vector<std::string>                 labels_{};
         float                                    confidence_threshold_{0.25F};
         float                                    iou_threshold_{0.45F};
@@ -64,6 +73,8 @@ namespace cvkit::infer
             {
                 case TaskKind::detection:
                     return "yolo11";
+                case TaskKind::classification:
+                    return "classification";
                 case TaskKind::promptable_segmentation:
                     return "sam";
                 case TaskKind::unknown:
@@ -78,6 +89,93 @@ namespace cvkit::infer
             auto                     future = promise.get_future().share();
             promise.set_value(std::move(output));
             return TaskFuture{std::move(future)};
+        }
+
+        template <typename ImplT>
+        [[nodiscard]] detail::PipelineContext make_pipeline_context(const ImplT& impl)
+        {
+            return detail::PipelineContext{
+                impl.spec_,
+                impl.labels_,
+                impl.confidence_threshold_,
+                impl.iou_threshold_};
+        }
+
+        template <typename ImplT>
+        [[nodiscard]] detail::TaskGraph make_pipeline_graph(const ImplT& impl)
+        {
+            return detail::create_pipeline_graph(impl.backend_, impl.pipeline_, make_pipeline_context(impl));
+        }
+
+        template <typename ImplT>
+        [[nodiscard]] bool has_runtime_state(const ImplT& impl)
+        {
+            return impl.loaded_ && impl.backend_ != nullptr && impl.pipeline_ != nullptr;
+        }
+
+        template <typename SessionT>
+        void append_session_tensors(std::vector<TensorInfo>& destination, const SessionT& session, bool inputs)
+        {
+            for (std::size_t index = 0;; ++index)
+            {
+                const auto* tensor = inputs ? session.input_info(index) : session.output_info(index);
+                if (tensor == nullptr)
+                {
+                    break;
+                }
+                destination.push_back(*tensor);
+            }
+        }
+
+        [[nodiscard]] GraphInfo convert_graph_info(const detail::TaskGraph& graph)
+        {
+            GraphInfo info{};
+            for (const auto& metadata : graph.metadata())
+            {
+                info.nodes.push_back(GraphNodeInfo{
+                    metadata.name,
+                    metadata.depends_on,
+                    metadata.consumes,
+                    metadata.produces});
+            }
+
+            const auto boundary = graph.boundary();
+            info.boundary.inputs = boundary.inputs;
+            info.boundary.outputs = boundary.outputs;
+            return info;
+        }
+
+        [[nodiscard]] std::vector<GraphTraceInfo> convert_graph_trace(const std::vector<detail::NodeTrace>& trace)
+        {
+            std::vector<GraphTraceInfo> result;
+            result.reserve(trace.size());
+            for (const auto& node : trace)
+            {
+                result.push_back(GraphTraceInfo{
+                    node.name,
+                    node.sequence,
+                    node.input_count,
+                    node.output_count,
+                    node.scratch_count,
+                    node.duration_us,
+                    node.ok,
+                    node.message});
+            }
+            return result;
+        }
+
+        template <typename TraceStateT>
+        void store_last_trace(const std::shared_ptr<TraceStateT>& trace_state, const detail::Packet& packet)
+        {
+            std::lock_guard<std::mutex> lock(trace_state->mutex);
+            trace_state->last_trace = convert_graph_trace(packet.trace);
+        }
+
+        template <typename TraceStateT>
+        void clear_last_trace(const std::shared_ptr<TraceStateT>& trace_state)
+        {
+            std::lock_guard<std::mutex> lock(trace_state->mutex);
+            trace_state->last_trace.clear();
         }
 
     }  // namespace
@@ -129,16 +227,6 @@ namespace cvkit::infer
         return true;
     }
 
-    bool Model::load(std::string model_path)
-    {
-        ModelSpec spec{};
-        spec.model_path = std::move(model_path);
-        spec.backend    = Backend::none;
-        spec.task       = TaskKind::detection;
-        spec.family     = "yolo11";
-        return load(spec);
-    }
-
     bool Model::load_labels(std::string labels_path)
     {
         std::vector<std::string> labels;
@@ -172,14 +260,64 @@ namespace cvkit::infer
         return impl_->pipeline_ != nullptr ? impl_->pipeline_->schema() : TaskSchema{};
     }
 
+    SessionInfo Model::session_info() const
+    {
+        SessionInfo info{};
+        if (impl_->backend_ == nullptr)
+        {
+            return info;
+        }
+
+        append_session_tensors(info.inputs, *impl_->backend_, true);
+        append_session_tensors(info.outputs, *impl_->backend_, false);
+
+        return info;
+    }
+
+    GraphInfo Model::graph_info() const
+    {
+        if (!has_runtime_state(*impl_))
+        {
+            return {};
+        }
+
+        return convert_graph_info(make_pipeline_graph(*impl_));
+    }
+
+    std::vector<GraphTraceInfo> Model::last_graph_trace() const
+    {
+        std::lock_guard<std::mutex> lock(impl_->trace_state_->mutex);
+        return impl_->trace_state_->last_trace;
+    }
+
     std::string_view Model::model_path() const
     {
         return impl_->spec_.model_path;
     }
 
+    std::string_view Model::aux_model_path() const
+    {
+        return impl_->spec_.aux_model_path;
+    }
+
     std::string_view Model::labels_path() const
     {
         return impl_->spec_.labels_path;
+    }
+
+    std::string_view Model::family() const
+    {
+        return impl_->spec_.family;
+    }
+
+    std::string_view Model::cache_dir() const
+    {
+        return impl_->spec_.cache_dir;
+    }
+
+    CachePolicy Model::cache_policy() const
+    {
+        return impl_->spec_.cache_policy;
     }
 
     void Model::set_confidence_threshold(float threshold)
@@ -204,22 +342,22 @@ namespace cvkit::infer
 
     TaskOutput Model::run_sync(const TaskInput& input) const
     {
-        if (!impl_->loaded_ || impl_->backend_ == nullptr || impl_->pipeline_ == nullptr)
+        if (!has_runtime_state(*impl_))
         {
             return {};
         }
 
-        const detail::PipelineContext context{
-            impl_->labels_,
-            impl_->confidence_threshold_,
-            impl_->iou_threshold_};
-
-        return impl_->pipeline_->run_sync(*impl_->backend_, input, context);
+        auto graph = make_pipeline_graph(*impl_);
+        detail::Packet packet{};
+        packet.input = input;
+        auto result = graph.run_sync(std::move(packet));
+        store_last_trace(impl_->trace_state_, result);
+        return std::move(result.output);
     }
 
     TaskFuture Model::submit(const TaskInput& input) const
     {
-        if (!impl_->loaded_ || impl_->backend_ == nullptr || impl_->pipeline_ == nullptr)
+        if (!has_runtime_state(*impl_))
         {
             return make_ready_future({});
         }
@@ -227,19 +365,17 @@ namespace cvkit::infer
         auto backend = impl_->backend_;
         auto pipeline = impl_->pipeline_;
         auto copied_input = input;
-        detail::PipelineContext context{
-            impl_->labels_,
-            impl_->confidence_threshold_,
-            impl_->iou_threshold_};
-
-        return impl_->executor_->submit(
-            [backend = std::move(backend),
-             pipeline = std::move(pipeline),
-             input = std::move(copied_input),
-             context = std::move(context)]() mutable
-            {
-                return pipeline->run_sync(*backend, input, context);
-            });
+        auto context = make_pipeline_context(*impl_);
+        auto trace_state = impl_->trace_state_;
+        auto graph = detail::create_pipeline_graph(std::move(backend), std::move(pipeline), std::move(context));
+        detail::Packet packet{};
+        packet.input = std::move(copied_input);
+        clear_last_trace(trace_state);
+        return impl_->executor_->submit([graph = std::move(graph), packet = std::move(packet), trace_state = std::move(trace_state)]() mutable {
+            auto result = graph.submit_packet(std::move(packet)).get();
+            store_last_trace(trace_state, result);
+            return std::move(result.output);
+        });
     }
 
     std::vector<cvkit::core::Detection> Model::run_detection(const cvkit::core::Frame& frame) const
@@ -255,11 +391,6 @@ namespace cvkit::infer
         }
 
         return {};
-    }
-
-    std::vector<cvkit::core::Detection> Model::run(const cvkit::core::Frame& frame) const
-    {
-        return run_detection(frame);
     }
 
 }  // namespace cvkit::infer

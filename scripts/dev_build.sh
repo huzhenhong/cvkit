@@ -29,6 +29,11 @@ Usage:
 Default:
   release
 
+Behavior:
+  - runs conan install, cmake configure, cmake build, and ctest
+  - configures CMake with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  - syncs build/conan/<Config>/compile_commands.json to build/compile_commands.json
+
 Environment overrides:
   CVKIT_DIR
   CONAN_BIN
@@ -112,6 +117,7 @@ cmake_configure() {
         -DCMAKE_TOOLCHAIN_FILE="${build_dir}/generators/conan_toolchain.cmake"
         -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
         -DCMAKE_BUILD_TYPE="${build_type}"
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
         -DCVKIT_BUILD_EXAMPLES="${BUILD_EXAMPLES}"
         -DCVKIT_BUILD_TESTS="${BUILD_TESTS}"
         -DCVKIT_BUILD_BENCHMARKS="${BUILD_BENCHMARKS}"
@@ -164,6 +170,7 @@ sync_compile_commands() {
     fi
 
     print_section "sync compile_commands ${build_type}"
+    mkdir -p "$(dirname "${target_db}")"
     cp "${source_db}" "${target_db}"
 }
 

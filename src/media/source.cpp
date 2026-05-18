@@ -247,6 +247,7 @@ namespace cvkit::media
             {
                 sample = gst_app_sink_try_pull_sample(sink_, 15 * GST_SECOND);
             }
+
             if (sample == nullptr)
             {
                 static_cast<void>(check_bus_for_error(pipeline_));

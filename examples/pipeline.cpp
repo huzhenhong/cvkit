@@ -1,4 +1,5 @@
 #include "pipeline_support.h"
+#include "example_infer_utils.h"
 
 #include <basekit/ext/bk_cli11.h>
 
@@ -22,23 +23,6 @@ namespace
         return cvkit::infer::Backend::none;
     }
 
-    [[nodiscard]] cvkit::infer::CachePolicy parse_cache_policy(std::string_view value)
-    {
-        if (value == "disabled")
-        {
-            return cvkit::infer::CachePolicy::disabled;
-        }
-        if (value == "read-only")
-        {
-            return cvkit::infer::CachePolicy::read_only;
-        }
-        if (value == "rebuild")
-        {
-            return cvkit::infer::CachePolicy::rebuild;
-        }
-        return cvkit::infer::CachePolicy::default_policy;
-    }
-
 }  // namespace
 
 int main(int argc, char** argv)
@@ -59,7 +43,9 @@ int main(int argc, char** argv)
     std::string cache_policy         = "default";
     std::string cache_dir{};
     std::string gst_codec            = "jpegavi";
+    std::string dump_graph_json_path{};
     bool        async_infer          = false;
+    bool        print_graph          = false;
     float       confidence_threshold = 0.25F;
     float       iou_threshold        = 0.45F;
     std::size_t max_frames           = 0;
@@ -77,6 +63,8 @@ int main(int argc, char** argv)
     app.add_option("--cache-dir", cache_dir, "Optional model cache directory");
     app.add_option("--gst-codec", gst_codec, "GStreamer writer codec: jpegavi, x264mp4, nvh264, nvv4l2h264");
     app.add_flag("--async", async_infer, "Run inference through the async submit() path");
+    app.add_flag("--print-graph", print_graph, "Print graph nodes, boundary, and the most recent node trace");
+    app.add_option("--dump-graph-json", dump_graph_json_path, "Write graph metadata and latest trace to a JSON file");
     app.add_option("--conf", confidence_threshold, "Confidence threshold")->check(CLI::Range(0.0, 1.0));
     app.add_option("--iou", iou_threshold, "NMS IoU threshold")->check(CLI::Range(0.0, 1.0));
     app.add_option("--max-frames", max_frames, "Limit processed video frames, 0 means all frames");
@@ -103,7 +91,7 @@ int main(int argc, char** argv)
     spec.labels_path = labels_path;
     spec.backend     = parse_infer_backend(infer_backend);
     spec.task        = cvkit::infer::TaskKind::detection;
-    spec.cache_policy = parse_cache_policy(cache_policy);
+    spec.cache_policy = cvkit::examples::parse_cache_policy(cache_policy);
     spec.cache_dir    = cache_dir;
     spec.family      = "yolo11";
 
@@ -120,7 +108,9 @@ int main(int argc, char** argv)
             image_path,
             output_dir,
             cvkit::examples::parse_reader_backend(reader_backend),
-            async_infer);
+            async_infer,
+            print_graph,
+            dump_graph_json_path);
     }
 
     if (!video_path.empty())
@@ -133,7 +123,9 @@ int main(int argc, char** argv)
             cvkit::examples::parse_reader_backend(reader_backend),
             cvkit::examples::parse_writer_backend(writer_backend),
             cvkit::examples::parse_gst_codec(gst_codec),
-            async_infer);
+            async_infer,
+            print_graph,
+            dump_graph_json_path);
     }
 
     std::cerr << "either --image or --video is required\n";

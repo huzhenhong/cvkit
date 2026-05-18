@@ -28,6 +28,11 @@ target_link_libraries(cvkit_test_infer
         Catch2::Catch2WithMain
 )
 
+if(TARGET CUDA::cudart)
+    target_compile_definitions(cvkit_test_infer PRIVATE CVKIT_WITH_CUDA_RUNTIME=1)
+    target_link_libraries(cvkit_test_infer PRIVATE CUDA::cudart)
+endif()
+
 if(CVKIT_ENABLE_TENSORRT)
     target_compile_definitions(cvkit_test_infer PRIVATE CVKIT_WITH_TENSORRT=1)
 endif()

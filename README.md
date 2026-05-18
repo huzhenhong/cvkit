@@ -2,6 +2,10 @@
 
 `cvkit` is the vision/media domain library that sits above `basekit`.
 
+Architecture details:
+
+- `docs/ARCHITECTURE.md`
+
 Layering:
 
 ```text
@@ -13,9 +17,10 @@ app
 
 Current focus:
 
-- YOLO11 ONNX inference
+- YOLO11 detection with ONNX Runtime and TensorRT
+- EfficientSAM-style promptable segmentation with encoder/decoder split
 - image/video input with selectable media backends
-- annotated image/video output
+- graph-aware async execution, tracing, and JSON export
 - clean separation between domain APIs and third-party implementations
 
 ## Components
@@ -27,7 +32,7 @@ Current focus:
 - `cvkit::image`
   - image operations used by the inference path
 - `cvkit::infer`
-  - YOLO11-oriented ONNX Runtime inference pipeline
+  - multi-backend inference, task graph execution, and task-oriented pipelines
 
 ## Third-Party Strategy
 
@@ -47,6 +52,20 @@ Reserved but not implemented yet:
 
 - FFmpeg backend
 - OpenVINO backend
+
+Current first-stage inference scope:
+
+- implemented tasks:
+  - detection
+  - classification
+  - promptable segmentation
+- implemented backends:
+  - onnxruntime
+  - tensorrt
+- planned but not implemented task families:
+  - segmentation
+  - pose
+  - facemesh
 
 ## Build Options
 
@@ -100,6 +119,13 @@ Conventions:
 - default model path: `assets/models/yolo11n.onnx`
 - generated example outputs go to `assets/output/`
 
+Current promptable-segmentation assets:
+
+- encoder model:
+  - `assets/models/efficient_sam_vitt_encoder.sim.onnx`
+- decoder model:
+  - `assets/models/efficient_sam_vitt_decoder.sim.onnx`
+
 ## Local Build
 
 Package and toolchain preparation:
@@ -150,7 +176,16 @@ Main local entrypoints:
 - `cmake configure`
 - `cmake build`
 - `ctest`
+- `CMAKE_EXPORT_COMPILE_COMMANDS=ON`
 - `compile_commands.json` sync to `build/compile_commands.json`
+
+Current script behavior notes:
+
+- default mode is `release`
+- after a successful build, the active build tree's `compile_commands.json` is copied to:
+  - `build/compile_commands.json`
+- TensorRT-specific smoke tests remain opt-in and still require:
+  - `CVKIT_RUN_TENSORRT_SMOKE=1`
 
 Useful environment overrides:
 
@@ -167,6 +202,8 @@ Useful environment overrides:
 - `ONNXRUNTIME_PREFIX`
 - `CUDATOOLKIT_ROOT`
 - `CUDART_LIBRARY`
+- `CVKIT_EXECUTOR_THREADS`
+- `CVKIT_TRACE_GRAPH`
 
 Example:
 
@@ -194,6 +231,9 @@ Supported CLI options:
 - `--cache-policy default|disabled|read-only|rebuild`
 - `--cache-dir`
 - `--gst-codec jpegavi|x264mp4|nvh264|nvv4l2h264`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
 - `--conf`
 - `--iou`
 - `--max-frames`
@@ -207,6 +247,114 @@ TensorRT cache behavior:
 - cache file naming:
   - model fingerprint + runtime fingerprint
 - legacy `*.trt.plan` files are still accepted and migrated to the new cache layout when possible
+- `ModelSpec::tensorrt_profiles`
+  - optional per-input override for TensorRT optimization profile shapes
+  - lets you provide explicit `min/opt/max` shapes by input tensor name
+  - if omitted, `cvkit` falls back to task-aware defaults for the current detection and promptable-segmentation paths
+- `ModelSpec::tensorrt_prefer_device_outputs`
+  - optional TensorRT-only hint to keep backend output metadata and raw outputs CUDA-resident when possible
+  - current detection path can still run with this enabled because detection postprocess materializes host copies when needed
+
+Current public data-contract notes:
+
+- `TaskInput` / `TaskOutput`
+  - support richer value types instead of only raw `Frame` and detection lists
+- `ImageValue`
+  - carries:
+    - `frame`
+    - `memory_device`
+    - `device`
+    - `storage`
+    - `row_stride_bytes`
+    - `external_data`
+    - `storage_bytes`
+  - current examples and host-side pipelines use `StorageKind::owned`
+  - host processing currently requires a valid host layout
+  - detection now also accepts `memory_device=cuda` image inputs when a valid external device view is provided
+- `TensorValue`
+  - carries:
+    - `name`
+    - `shape`
+    - `data`
+    - `data_type`
+    - `memory_device`
+    - `storage`
+    - `external_data`
+    - `storage_bytes`
+  - current generic execution contract accepts host `float32` input tensors
+  - current TensorRT path additionally supports CUDA-resident external-view `float32` input tensors
+- classification first-stage status:
+  - current pipeline is host-first and task-oriented
+  - it resizes and normalizes image input on CPU
+  - it returns:
+    - `classification`
+    - `scores`
+  - there is no bundled classification model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
+- promptable segmentation decoder can now consume CUDA-resident `image_embeddings` by materializing them back to host before the current ONNX Runtime execution path
+- promptable segmentation encoder and combined flows can now also accept CUDA-resident `ImageValue` inputs; current ONNX Runtime execution still materializes them back to host before encoder execution
+- when an ONNX Runtime session is loaded with `ModelSpec.device.kind = cuda`, CUDA-resident promptable decoder embeddings can now flow through a real ORT CUDA tensor input path instead of always being copied back to host first
+  - current backend export contract still emits `float32` tensors only
+- tensor file format:
+  - current writer emits `CVKTEMB3`
+  - readers remain backward-compatible with `CVKTEMB2` and `CVKTEMB1`
+
+Current detection CUDA-preprocess status:
+
+- if CUDA language support is available at configure time, `cvkit::infer` builds a device-side YOLO preprocess kernel
+- if only `cudart` is available, detection still accepts `ImageValue(memory_device=cuda)` but currently falls back to:
+  - device-to-host copy
+  - existing CPU preprocess
+- on the TensorRT path with CUDA language enabled, detection can now produce a CUDA-resident float32 input tensor and bind it directly into TensorRT without an extra host-to-device upload
+- current CMake autodiscovery prefers:
+  - `/usr/local/cuda-13.0/bin/nvcc`
+  - then `/usr/local/bin/nvcc`
+
+Execution and graph tracing:
+
+- `--async`
+  - runs inference through `Model::submit()` instead of the direct synchronous path
+- `--print-graph`
+  - prints the task graph nodes, inferred graph boundary, and the most recent per-node trace from the example process
+  - useful when checking `consumes` / `produces` contracts and the actual node order without attaching a debugger
+- `--dump-graph-json`
+  - writes the same graph metadata and latest trace to a JSON file
+  - useful for scripting, visualization, and offline DAG inspection
+  - current schema version: `5`
+- `CVKIT_EXECUTOR_THREADS`
+  - controls the shared internal executor thread-pool size
+- `CVKIT_TRACE_GRAPH=1`
+  - enables per-node graph timing logs through `basekit::log`
+  - each node log includes:
+    - node name
+    - sequence index
+    - duration in microseconds
+    - input count
+    - output delta
+    - scratch delta
+
+Example `--print-graph` output:
+
+```text
+graph.nodes=2
+  node=detection_infer consumes=input:image produces=scratch:detection.preprocess,scratch:detection.raw_outputs
+  node=detection_postprocess depends_on=detection_infer consumes=input:image,scratch:detection.preprocess,scratch:detection.raw_outputs produces=output:detections
+graph.inputs=input:image
+graph.outputs=output:detections
+graph.trace.nodes=2
+  trace.node=detection_infer seq=0 duration_us=114473 input_count=1 output_count=0 scratch_count=2
+  trace.node=detection_postprocess seq=1 duration_us=2741 input_count=1 output_count=1 scratch_count=0
+```
+
+Example JSON dump:
+
+```bash
+CUDA_VISIBLE_DEVICES=7 build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend tensorrt \
+  --image assets/images/test_001.jpg \
+  --output-dir assets/output \
+  --async \
+  --dump-graph-json assets/output/graph.json
+```
 
 Image run:
 
@@ -243,11 +391,96 @@ TensorRT run with explicit cache control:
   --output-dir /workspace/cvkit/assets/output
 ```
 
+TensorRT run with async infer and graph timing:
+
+```bash
+CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
+/workspace/cvkit/build/conan/Release/examples/bin/cvkit_example_pipeline \
+  --infer-backend tensorrt \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --output-dir /workspace/cvkit/assets/output \
+  --async
+```
+
 Validated output examples already in the workspace:
 
 - `assets/output/test_001_det.jpg`
 - `assets/output/test_det.avi`
 - `assets/output/test_det.mp4`
+
+## Promptable Segmentation Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_promptable_segmentation`
+
+Current first-stage implementation:
+
+- backend:
+  - `onnxruntime`
+- family:
+  - `efficient_sam`
+  - `efficient_sam_encoder`
+  - `efficient_sam_decoder`
+- model layout:
+  - `--encoder` points to `efficient_sam_vitt_encoder.sim.onnx`
+  - `--decoder` points to `efficient_sam_vitt_decoder.sim.onnx`
+- run modes:
+  - `--mode combined`
+    - runs encoder + decoder end-to-end
+  - `--mode encoder`
+    - runs only the encoder and writes `image_embeddings`
+  - `--mode decoder`
+    - consumes a previously exported `image_embeddings` file and runs only the decoder
+- supported prompts:
+  - single or multiple point prompts through `--point-x/--point-y`
+  - optional box prompt through `--use-box --box-x --box-y --box-w --box-h`
+- embedding exchange:
+  - use `--embeddings <path>`
+  - current example format is a compact cvkit binary tensor file (`*.bin`)
+
+Example run:
+
+```bash
+/tmp/cvkit-ort-out/conan/Release/examples/bin/cvkit_example_promptable_segmentation \
+  --mode combined \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --point-x 640 \
+  --point-y 360 \
+  --output-dir /workspace/cvkit/assets/output \
+  --print-graph \
+  --dump-graph-json /workspace/cvkit/assets/output/efficient_sam_graph.json
+```
+
+Encoder-only export:
+
+```bash
+/tmp/cvkit-ort-out/conan/Release/examples/bin/cvkit_example_promptable_segmentation \
+  --mode encoder \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --point-x 640 \
+  --point-y 360 \
+  --embeddings /workspace/cvkit/assets/output/test_001_sam_embeddings.bin
+```
+
+Decoder-only run:
+
+```bash
+/tmp/cvkit-ort-out/conan/Release/examples/bin/cvkit_example_promptable_segmentation \
+  --mode decoder \
+  --image /workspace/cvkit/assets/images/test_001.jpg \
+  --point-x 640 \
+  --point-y 360 \
+  --embeddings /workspace/cvkit/assets/output/test_001_sam_embeddings.bin \
+  --output-dir /workspace/cvkit/assets/output
+```
+
+Validated outputs now present in the workspace:
+
+- `assets/output/test_001_sam_mask.png`
+- `assets/output/test_001_sam_overlay.png`
+- `assets/output/efficient_sam_graph.json`
+- `assets/output/test_001_sam_embeddings.bin`
 
 ## Current State
 
@@ -262,13 +495,55 @@ Verified locally:
 - `CVKIT_ENABLE_GSTREAMER_CUDA=ON` configure/build path has been validated
 - TensorRT backend load/run/cache path has been validated on GPU 7
 - TensorRT serialized engine cache supports fingerprinted cache files and legacy cache migration
+- internal async executor path has been validated
+- graph-aware async execution is active for detection and promptable segmentation
+- task graph metadata and per-node timing trace are available
+- `cvkit::infer::Model::session_info()` now exposes backend tensor input/output metadata through the public API
+- `ImageValue` and `TensorValue` now carry minimal device-aware contract metadata
+- examples now use `ImageValue` as the primary image input object
+- tensor session/debug metadata now includes:
+  - `data_type`
+  - `memory_device`
+- tensor/image contracts now distinguish:
+  - host layout validity
+  - storage kind (`owned` vs `external_view`)
+
+Current note on local backend selection:
+
+- some local build trees may have `CVKIT_ENABLE_ONNXRUNTIME=OFF`
+- in those trees, the example should be run with `--infer-backend tensorrt` instead of relying on the default
 
 Not yet finalized:
 
 - FFmpeg backend
 - OpenVINO backend
 - production-grade video writer abstraction outside the example support layer
-- true asynchronous infer execution beyond the current synchronous `submit()` wrapper
+- generalized non-host / non-float32 tensor execution paths
+- production GPU preprocess and broader device-resident data flow
+- more task families beyond detection, classification, and promptable segmentation
+- stronger external-view / zero-copy ownership model beyond the current metadata-only `storage` contract
+
+## Planned Next
+
+Near-term work planned from the current codebase state:
+
+- continue device-aware data-path work
+  - keep public contracts stable while preparing for CUDA-backed image/tensor paths
+- move from metadata-only device awareness toward real GPU preprocess support
+- continue tightening the backend tensor-engine contract
+  - especially around non-host and non-float32 execution support
+- extend task coverage
+  - segmentation
+  - pose
+  - facemesh
+
+Important scope note:
+
+- these are planned directions, not promises of current production readiness
+- the current repository state is strongest in:
+  - YOLO11 detection
+  - EfficientSAM promptable segmentation
+  - task-graph execution and observability
 
 ## CI Entrypoints
 

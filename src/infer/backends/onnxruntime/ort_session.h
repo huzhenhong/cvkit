@@ -30,6 +30,8 @@ namespace cvkit::infer::detail
         std::vector<std::string>      output_names_{};
         std::vector<TensorInfo>       input_infos_{};
         std::vector<TensorInfo>       output_infos_{};
+        bool                          cuda_execution_enabled_{false};
+        int                           cuda_device_index_{0};
 #endif
         bool ready_{false};
     };

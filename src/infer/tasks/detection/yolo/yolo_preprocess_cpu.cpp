@@ -1,5 +1,6 @@
 #include "yolo_preprocess_cpu.h"
 
+#include "../../../utils/opencv_utils.h"
 #include "../../../utils/tensor_layout.h"
 
 #include <opencv2/core.hpp>
@@ -12,23 +13,6 @@
 
 namespace cvkit::infer::detail
 {
-    namespace
-    {
-
-        [[nodiscard]] cv::Mat frame_to_mat(const cvkit::core::Frame& frame)
-        {
-            if (frame.desc.width <= 0 || frame.desc.height <= 0 || frame.desc.channels <= 0 || frame.data.empty())
-            {
-                return {};
-            }
-
-            const auto type = frame.desc.channels == 3 ? CV_8UC3 : CV_8UC1;
-            cv::Mat    mat(frame.desc.height, frame.desc.width, type, const_cast<std::uint8_t*>(frame.data.data()));
-            return mat.clone();
-        }
-
-    }  // namespace
-
     LetterboxResult preprocess_yolo_cpu(
         const cvkit::core::Frame&        frame,
         const std::vector<std::int64_t>& input_shape)
@@ -46,7 +30,7 @@ namespace cvkit::infer::detail
             return result;
         }
 
-        auto source = frame_to_mat(frame);
+        auto source = frame_to_mat_copy(frame);
         if (source.empty())
         {
             return result;

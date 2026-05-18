@@ -11,6 +11,7 @@ namespace cvkit::infer
     {
         unknown,
         detection,
+        classification,
         promptable_segmentation,
     };
 

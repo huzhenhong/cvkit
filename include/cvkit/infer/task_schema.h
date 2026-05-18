@@ -11,9 +11,16 @@ namespace cvkit::infer
 
     enum class BK_INFER_EXPORT ValueKind : unsigned char
     {
+        image,
         frame,
+        mask,
+        classification,
         detections,
         points2f,
+        bbox,
+        bbox_list,
+        keypoints,
+        tensor,
         text,
         floats,
     };

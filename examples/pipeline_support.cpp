@@ -1,17 +1,17 @@
 #include "pipeline_support.h"
 
+#include "example_graph_utils.h"
+#include "example_opencv_utils.h"
+#include "pipeline_media_utils.h"
 #include "cvkit/core/types.h"
-#include "cvkit/media/source.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 
-#include <filesystem>
 #include <iostream>
 #include <string>
-#include <system_error>
 #include <vector>
 
 namespace cvkit::examples
@@ -19,36 +19,18 @@ namespace cvkit::examples
     namespace
     {
 
-        [[nodiscard]] cvkit::core::Frame mat_to_frame(const cv::Mat& image, std::string source)
-        {
-            cvkit::core::Frame frame{};
-            frame.desc.width    = image.cols;
-            frame.desc.height   = image.rows;
-            frame.desc.channels = image.channels();
-            frame.desc.format   = image.channels() == 3 ? cvkit::core::PixelFormat::bgr8 : cvkit::core::PixelFormat::unknown;
-            frame.source        = std::move(source);
-
-            if (!image.empty())
-            {
-                const auto bytes = image.total() * image.elemSize();
-                frame.data.assign(image.data, image.data + bytes);
-            }
-
-            return frame;
-        }
-
         [[nodiscard]] std::vector<cvkit::core::Detection> infer_detections(
             cvkit::infer::Model& model,
-            const cvkit::core::Frame& frame,
+            const cvkit::infer::ImageValue& image,
             bool async_infer)
         {
             if (!async_infer)
             {
-                return model.run(frame);
+                return model.run_detection(image.frame);
             }
 
             cvkit::infer::TaskInput input{};
-            input.add("image", frame);
+            input.add("image", image);
             auto future = model.submit(input);
             const auto output = future.get();
             if (const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
@@ -58,55 +40,6 @@ namespace cvkit::examples
             }
 
             return {};
-        }
-
-        [[nodiscard]] std::string escape_path_for_gstreamer(const std::filesystem::path& path)
-        {
-            auto        location = std::filesystem::absolute(path).string();
-            std::size_t offset   = 0;
-            while ((offset = location.find('\\', offset)) != std::string::npos)
-            {
-                location.replace(offset, 1, "\\\\");
-                offset += 2;
-            }
-
-            offset = 0;
-            while ((offset = location.find('"', offset)) != std::string::npos)
-            {
-                location.replace(offset, 1, "\\\"");
-                offset += 2;
-            }
-
-            return location;
-        }
-
-        [[nodiscard]] std::string gstreamer_filesrc_pipeline(const std::filesystem::path& path)
-        {
-            return "filesrc location=\"" + escape_path_for_gstreamer(path) + "\" ! decodebin ! videoconvert ! appsink sync=false";
-        }
-
-        [[nodiscard]] std::string gstreamer_writer_pipeline(
-            const std::filesystem::path& path,
-            cvkit::media::GstVideoCodec  codec)
-        {
-            const auto location = escape_path_for_gstreamer(path);
-
-            if (codec == cvkit::media::GstVideoCodec::x264mp4)
-            {
-                return "appsrc ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            if (codec == cvkit::media::GstVideoCodec::nvh264)
-            {
-                return "appsrc ! videoconvert ! nvh264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            if (codec == cvkit::media::GstVideoCodec::nvv4l2h264)
-            {
-                return "appsrc ! videoconvert ! nvv4l2h264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            return "appsrc ! videoconvert ! jpegenc ! avimux ! filesink location=\"" + location + "\"";
         }
 
         [[nodiscard]] cv::Scalar class_color(int class_id)
@@ -171,14 +104,6 @@ namespace cvkit::examples
                     cv::LINE_AA);
             }
         }
-
-        [[nodiscard]] std::filesystem::path ensure_output_dir(const std::filesystem::path& output_dir)
-        {
-            std::error_code ec;
-            std::filesystem::create_directories(output_dir, ec);
-            return output_dir;
-        }
-
     }  // namespace
 
     cvkit::media::ReaderBackend parse_reader_backend(std::string_view value)
@@ -229,47 +154,31 @@ namespace cvkit::examples
         const std::filesystem::path& image_path,
         const std::filesystem::path& output_dir,
         cvkit::media::ReaderBackend  reader_backend,
-        bool                         async_infer)
+        bool                         async_infer,
+        bool                         print_graph,
+        const std::filesystem::path& dump_graph_json_path)
     {
+        if (print_graph)
+        {
+            cvkit::examples::print_graph_info(std::cout, model);
+        }
+
         cv::Mat image;
-        if (reader_backend == cvkit::media::ReaderBackend::gstreamer)
-        {
-            cvkit::media::Source        source;
-            cvkit::media::SourceOptions source_options{};
-            source_options.uri     = image_path.string();
-            source_options.backend = reader_backend;
-            if (!source.open(std::move(source_options)))
-            {
-                std::cerr << "failed to open image with gstreamer: " << image_path << '\n';
-                return 1;
-            }
-
-            cvkit::core::Frame frame{};
-            if (!source.read(frame))
-            {
-                std::cerr << "failed to read image with gstreamer: " << image_path << '\n';
-                return 1;
-            }
-
-            image = cv::Mat(
-                        frame.desc.height,
-                        frame.desc.width,
-                        frame.desc.channels == 3 ? CV_8UC3 : CV_8UC1,
-                        frame.data.data())
-                        .clone();
-        }
-        else
-        {
-            image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
-        }
-
-        if (image.empty())
+        if (!read_image(image_path, reader_backend, image))
         {
             std::cerr << "failed to read image: " << image_path << '\n';
             return 1;
         }
 
-        auto detections = infer_detections(model, mat_to_frame(image, image_path.string()), async_infer);
+        auto detections = infer_detections(model, mat_to_image_value(image, image_path.string()), async_infer);
+        if (print_graph)
+        {
+            cvkit::examples::print_graph_trace(std::cout, model);
+        }
+        if (!cvkit::examples::dump_graph_json(model, async_infer, dump_graph_json_path))
+        {
+            return 1;
+        }
         draw_detections(image, detections);
 
         const auto output_root = ensure_output_dir(output_dir);
@@ -297,88 +206,27 @@ namespace cvkit::examples
         cvkit::media::ReaderBackend  reader_backend,
         cvkit::media::WriterBackend  writer_backend,
         cvkit::media::GstVideoCodec  gst_codec,
-        bool                         async_infer)
+        bool                         async_infer,
+        bool                         print_graph,
+        const std::filesystem::path& dump_graph_json_path)
     {
-        if (writer_backend == cvkit::media::WriterBackend::ffmpeg)
+        if (print_graph)
         {
-            std::cerr << "writer backend not implemented yet: ffmpeg\n";
-            return 1;
+            cvkit::examples::print_graph_info(std::cout, model);
         }
 
         cv::Mat          first_frame;
         cv::VideoCapture capture;
         double           fps = 25.0;
-
-        if (reader_backend == cvkit::media::ReaderBackend::gstreamer)
+        if (!open_video_capture(video_path, reader_backend, capture, first_frame, fps))
         {
-            capture.open(gstreamer_filesrc_pipeline(video_path), cv::CAP_GSTREAMER);
-            if (!capture.isOpened())
-            {
-                std::cerr << "failed to open video with gstreamer: " << video_path << '\n';
-                return 1;
-            }
-
-            if (!capture.read(first_frame) || first_frame.empty())
-            {
-                std::cerr << "failed to read first frame with gstreamer: " << video_path << '\n';
-                return 1;
-            }
-            fps = std::max(1.0, capture.get(cv::CAP_PROP_FPS));
-        }
-        else
-        {
-            capture.open(video_path.string());
-            if (!capture.isOpened())
-            {
-                std::cerr << "failed to open video: " << video_path << '\n';
-                return 1;
-            }
-
-            if (!capture.read(first_frame) || first_frame.empty())
-            {
-                std::cerr << "failed to read first frame: " << video_path << '\n';
-                return 1;
-            }
-
-            fps = std::max(1.0, capture.get(cv::CAP_PROP_FPS));
+            return 1;
         }
 
-        const auto      output_root = ensure_output_dir(output_dir);
-        auto            output_path = output_root / (video_path.stem().string() + "_det.mp4");
+        std::filesystem::path output_path;
         cv::VideoWriter writer;
-        if (writer_backend == cvkit::media::WriterBackend::gstreamer)
+        if (!open_video_writer(video_path, output_dir, writer_backend, gst_codec, fps, first_frame.size(), writer, output_path))
         {
-            const bool mp4 = gst_codec == cvkit::media::GstVideoCodec::x264mp4 || gst_codec == cvkit::media::GstVideoCodec::nvh264 || gst_codec == cvkit::media::GstVideoCodec::nvv4l2h264;
-            output_path    = output_root / (video_path.stem().string() + (mp4 ? "_det.mp4" : "_det.avi"));
-            writer.open(
-                gstreamer_writer_pipeline(output_path, gst_codec),
-                cv::CAP_GSTREAMER,
-                0,
-                fps,
-                first_frame.size(),
-                true);
-        }
-        else
-        {
-            writer.open(
-                output_path.string(),
-                cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
-                fps,
-                first_frame.size());
-            if (!writer.isOpened())
-            {
-                output_path = output_root / (video_path.stem().string() + "_det.avi");
-                writer.open(
-                    output_path.string(),
-                    cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
-                    fps,
-                    first_frame.size());
-            }
-        }
-
-        if (!writer.isOpened())
-        {
-            std::cerr << "failed to open video writer: " << output_path << '\n';
             return 1;
         }
 
@@ -388,7 +236,15 @@ namespace cvkit::examples
         bool        has_frame        = !frame.empty();
         do
         {
-            auto detections = infer_detections(model, mat_to_frame(frame, video_path.string()), async_infer);
+            auto detections = infer_detections(model, mat_to_image_value(frame, video_path.string()), async_infer);
+            if (print_graph && frame_index == 0)
+            {
+                cvkit::examples::print_graph_trace(std::cout, model);
+            }
+            if (frame_index == 0 && !cvkit::examples::dump_graph_json(model, async_infer, dump_graph_json_path))
+            {
+                return 1;
+            }
             total_detections += detections.size();
             draw_detections(frame, detections);
             writer.write(frame);

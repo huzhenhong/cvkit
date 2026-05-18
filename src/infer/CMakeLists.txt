@@ -2,19 +2,28 @@ include(GenerateExportHeader)
 
 add_library(cvkit_infer
     executor.cpp
+    graph/graph.cpp
     model.cpp
     session.cpp
     registry.cpp
     backends/onnxruntime/ort_session.cpp
     backends/tensorrt/trt_session.cpp
+    tasks/classification/classification_pipeline.cpp
     tasks/detection/detection_pipeline.cpp
     tasks/detection/yolo/yolo_preprocess_cpu.cpp
+    tasks/detection/yolo/yolo_preprocess_cuda.cpp
     tasks/detection/yolo/yolo_postprocess.cpp
     tasks/promptable_segmentation/promptable_segmentation_pipeline.cpp
+    tasks/promptable_segmentation/promptable_preprocess_cuda.cpp
+    utils/debug.cpp
+    utils/image_value_utils.cpp
     utils/labels.cpp
     utils/nms.cpp
     utils/bbox.cpp
+    utils/opencv_utils.cpp
+    utils/tensor_io.cpp
     utils/tensor_layout.cpp
+    utils/tensor_value_utils.cpp
 )
 
 add_library(cvkit::infer ALIAS cvkit_infer)
@@ -50,6 +59,18 @@ if(CVKIT_ENABLE_ONNXRUNTIME)
     target_link_libraries(cvkit_infer PRIVATE onnxruntime::onnxruntime)
 endif()
 
+if(TARGET CUDA::cudart)
+    target_compile_definitions(cvkit_infer PRIVATE CVKIT_WITH_CUDA_RUNTIME=1)
+    target_link_libraries(cvkit_infer PRIVATE CUDA::cudart)
+endif()
+
+if(CVKIT_ENABLE_CUDA_LANGUAGE)
+    target_compile_definitions(cvkit_infer PRIVATE CVKIT_WITH_CUDA_PREPROCESS_KERNEL=1)
+    target_sources(cvkit_infer PRIVATE tasks/detection/yolo/yolo_preprocess_cuda_kernel.cu)
+    target_sources(cvkit_infer PRIVATE tasks/promptable_segmentation/promptable_preprocess_cuda_kernel.cu)
+    set_target_properties(cvkit_infer PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+endif()
+
 if(CVKIT_ENABLE_OPENVINO)
     target_compile_definitions(cvkit_infer PRIVATE CVKIT_WITH_OPENVINO=1)
 endif()
@@ -57,7 +78,7 @@ endif()
 if(CVKIT_ENABLE_TENSORRT)
     target_compile_definitions(cvkit_infer PRIVATE CVKIT_WITH_TENSORRT=1)
     target_include_directories(cvkit_infer PRIVATE ${CVKIT_TENSORRT_INCLUDE_DIR})
-    target_link_libraries(cvkit_infer PRIVATE CUDA::cudart ${CVKIT_TENSORRT_NVINFER_LIBRARY} ${CVKIT_TENSORRT_NVONNXPARSER_LIBRARY})
+    target_link_libraries(cvkit_infer PRIVATE ${CVKIT_TENSORRT_NVINFER_LIBRARY} ${CVKIT_TENSORRT_NVONNXPARSER_LIBRARY})
 endif()
 
 set_target_properties(cvkit_infer PROPERTIES

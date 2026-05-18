@@ -25,10 +25,12 @@ namespace cvkit::infer::detail
         [[nodiscard]] const TensorInfo* input_info(std::size_t index = 0) const override;
         [[nodiscard]] const TensorInfo* output_info(std::size_t index = 0) const override;
         [[nodiscard]] RawTensorMap run(const RawTensorMap& inputs) const override;
+        [[nodiscard]] bool        supports_async() const override;
+        [[nodiscard]] BackendFuture run_async(const RawTensorMap& inputs) const override;
 
       private:
         class Impl;
-        std::unique_ptr<Impl> impl_;
+        std::shared_ptr<Impl> impl_;
     };
 
 }  // namespace cvkit::infer::detail

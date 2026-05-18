@@ -2,29 +2,67 @@
 
 #include "cvkit/infer/backend.h"
 #include "cvkit/infer/model.h"
+#include "cvkit/infer/session.h"
 
-#include <cstdint>
+#include <chrono>
+#include <future>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace cvkit::infer::detail
 {
 
-    struct RawTensor
+    using RawTensor = cvkit::infer::TensorValue;
+    using RawTensorMap = cvkit::infer::TensorMap;
+
+    class BackendFuture
     {
-        std::string               name{};
-        std::vector<std::int64_t> shape{};
-        std::vector<float>        data{};
+      public:
+        BackendFuture() = default;
+        explicit BackendFuture(std::shared_future<RawTensorMap> future)
+            : future_(std::move(future))
+        {
+        }
+
+        [[nodiscard]] bool valid() const
+        {
+            return future_.valid();
+        }
+
+        RawTensorMap get()
+        {
+            return future_.get();
+        }
+
+        template <typename Rep, typename Period>
+        [[nodiscard]] std::future_status wait_for(const std::chrono::duration<Rep, Period>& timeout) const
+        {
+            return future_.wait_for(timeout);
+        }
+
+      private:
+        std::shared_future<RawTensorMap> future_{};
     };
 
-    struct TensorInfo
+    [[nodiscard]] inline BackendFuture make_ready_backend_future(RawTensorMap outputs)
     {
-        std::string               name{};
-        std::vector<std::int64_t> shape{};
-    };
+        std::promise<RawTensorMap> promise;
+        auto future = promise.get_future().share();
+        promise.set_value(std::move(outputs));
+        return BackendFuture{std::move(future)};
+    }
 
-    using RawTensorMap = std::vector<RawTensor>;
+    [[nodiscard]] inline bool is_supported_backend_input_tensor(const RawTensor& tensor)
+    {
+        return tensor.data_type == TensorDataType::float32
+               && tensor.memory_device == MemoryDevice::host
+               && tensor.has_valid_host_layout();
+    }
+
+    [[nodiscard]] inline bool is_supported_backend_output_tensor_type(TensorDataType data_type)
+    {
+        return data_type == TensorDataType::float32;
+    }
 
     class IBackendSession
     {
@@ -37,6 +75,14 @@ namespace cvkit::infer::detail
         [[nodiscard]] virtual const TensorInfo* input_info(std::size_t index = 0) const  = 0;
         [[nodiscard]] virtual const TensorInfo* output_info(std::size_t index = 0) const = 0;
         [[nodiscard]] virtual RawTensorMap      run(const RawTensorMap& inputs) const    = 0;
+        [[nodiscard]] virtual bool              supports_async() const
+        {
+            return false;
+        }
+        [[nodiscard]] virtual BackendFuture     run_async(const RawTensorMap& inputs) const
+        {
+            return make_ready_backend_future(run(inputs));
+        }
     };
 
     [[nodiscard]] std::unique_ptr<IBackendSession> create_backend_session(Backend backend);

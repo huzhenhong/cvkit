@@ -1,10 +1,13 @@
 #pragma once
 
 #include "cvkit/core/types.h"
+#include "cvkit/infer/device.h"
 #include "cvkit/infer/infer_export.h"
 
 #include <future>
 #include <chrono>
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -14,12 +17,226 @@
 namespace cvkit::infer
 {
 
+    using DetectionListValue = std::vector<cvkit::core::Detection>;
+    using PointListValue     = std::vector<cvkit::core::Point2f>;
+    using FloatListValue     = std::vector<float>;
+
+    enum class BK_INFER_EXPORT StorageKind : std::uint8_t
+    {
+        owned,
+        external_view,
+    };
+
+    struct BK_INFER_EXPORT ImageValue
+    {
+        cvkit::core::Frame frame{};
+        MemoryDevice       memory_device{MemoryDevice::host};
+        DeviceRef          device{};
+        StorageKind        storage{StorageKind::owned};
+        std::size_t        row_stride_bytes{0};
+        const void*        external_data{nullptr};
+        std::size_t        storage_bytes{0};
+
+        [[nodiscard]] bool is_host_accessible() const
+        {
+            return memory_device == MemoryDevice::host;
+        }
+
+        [[nodiscard]] bool owns_storage() const
+        {
+            return storage == StorageKind::owned;
+        }
+
+        [[nodiscard]] std::size_t bytes_per_pixel() const
+        {
+            return frame.desc.channels > 0
+                       ? static_cast<std::size_t>(frame.desc.channels)
+                       : 0U;
+        }
+
+        [[nodiscard]] std::size_t packed_row_stride_bytes() const
+        {
+            return frame.desc.width > 0
+                       ? static_cast<std::size_t>(frame.desc.width) * bytes_per_pixel()
+                       : 0U;
+        }
+
+        [[nodiscard]] std::size_t effective_row_stride_bytes() const
+        {
+            return row_stride_bytes > 0 ? row_stride_bytes : packed_row_stride_bytes();
+        }
+
+        [[nodiscard]] bool is_packed() const
+        {
+            return effective_row_stride_bytes() == packed_row_stride_bytes();
+        }
+
+        [[nodiscard]] std::size_t required_byte_size() const
+        {
+            if (frame.desc.width <= 0 || frame.desc.height <= 0 || frame.desc.channels <= 0)
+            {
+                return 0U;
+            }
+            return effective_row_stride_bytes() * static_cast<std::size_t>(frame.desc.height);
+        }
+
+        [[nodiscard]] bool has_valid_host_layout() const
+        {
+            if (!is_host_accessible())
+            {
+                return false;
+            }
+            if (frame.desc.width <= 0 || frame.desc.height <= 0 || frame.desc.channels <= 0 ||
+                frame.data.empty())
+            {
+                return false;
+            }
+            const auto stride = effective_row_stride_bytes();
+            if (stride == 0)
+            {
+                return false;
+            }
+            return frame.data.size() >= required_byte_size();
+        }
+
+        [[nodiscard]] bool has_valid_device_view() const
+        {
+            if (is_host_accessible())
+            {
+                return false;
+            }
+            if (frame.desc.width <= 0 || frame.desc.height <= 0 || frame.desc.channels <= 0)
+            {
+                return false;
+            }
+            if (external_data == nullptr)
+            {
+                return false;
+            }
+            const auto required = required_byte_size();
+            return required > 0U && storage_bytes >= required;
+        }
+    };
+
+    struct BK_INFER_EXPORT MaskValue
+    {
+        cvkit::core::Frame frame{};
+    };
+
+    struct BK_INFER_EXPORT ClassificationValue
+    {
+        int         class_id{-1};
+        float       score{0.0F};
+        std::string label{};
+    };
+
+    struct BK_INFER_EXPORT BoxListValue
+    {
+        std::vector<cvkit::core::BBox> boxes{};
+    };
+
+    struct BK_INFER_EXPORT KeypointsValue
+    {
+        std::vector<cvkit::core::Point2f> points{};
+    };
+
+    enum class BK_INFER_EXPORT TensorDataType : std::uint8_t
+    {
+        unknown,
+        float32,
+        float16,
+        int32,
+        int64,
+        uint8,
+        boolean,
+    };
+
+    struct BK_INFER_EXPORT TensorValue
+    {
+        std::string               name{};
+        std::vector<std::int64_t> shape{};
+        std::vector<float>        data{};
+        TensorDataType            data_type{TensorDataType::float32};
+        MemoryDevice              memory_device{MemoryDevice::host};
+        StorageKind               storage{StorageKind::owned};
+        const void*               external_data{nullptr};
+        std::size_t               storage_bytes{0};
+        std::shared_ptr<void>     storage_owner{};
+
+        [[nodiscard]] bool is_host_accessible() const
+        {
+            return memory_device == MemoryDevice::host;
+        }
+
+        [[nodiscard]] bool owns_storage() const
+        {
+            return storage == StorageKind::owned;
+        }
+
+        [[nodiscard]] std::size_t element_count() const
+        {
+            if (shape.empty())
+            {
+                return 0U;
+            }
+
+            std::size_t count = 1U;
+            for (const auto dim : shape)
+            {
+                if (dim <= 0)
+                {
+                    return 0U;
+                }
+                count *= static_cast<std::size_t>(dim);
+            }
+            return count;
+        }
+
+        [[nodiscard]] std::size_t packed_byte_size() const
+        {
+            return element_count() * sizeof(float);
+        }
+
+        [[nodiscard]] std::size_t byte_size() const
+        {
+            return data.size() * sizeof(float);
+        }
+
+        [[nodiscard]] bool is_packed() const
+        {
+            const auto count = element_count();
+            return count > 0U && data.size() == count;
+        }
+
+        [[nodiscard]] bool has_valid_host_layout() const
+        {
+            return is_host_accessible() && element_count() > 0U && data.size() >= element_count();
+        }
+
+        [[nodiscard]] bool has_valid_device_view() const
+        {
+            if (is_host_accessible())
+            {
+                return false;
+            }
+            const auto required = packed_byte_size();
+            return required > 0U && external_data != nullptr && storage_bytes >= required;
+        }
+    };
+
     using Value = std::variant<
+        ImageValue,
         cvkit::core::Frame,
-        std::vector<cvkit::core::Detection>,
-        std::vector<cvkit::core::Point2f>,
+        MaskValue,
+        ClassificationValue,
+        DetectionListValue,
+        PointListValue,
+        cvkit::core::BBox,
+        BoxListValue,
+        KeypointsValue,
+        TensorValue,
         std::string,
-        std::vector<float>>;
+        FloatListValue>;
 
     struct BK_INFER_EXPORT NamedValue
     {

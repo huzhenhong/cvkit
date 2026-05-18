@@ -14,9 +14,9 @@
     "-DCVKIT_BUILD_EXAMPLES=ON",
     "-DCVKIT_BUILD_TESTS=ON",
     "-DCVKIT_BUILD_BENCHMARKS=OFF",
-    "-DCVKIT_ENABLE_ONNXRUNTIME=OFF",
+    "-DCVKIT_ENABLE_ONNXRUNTIME=ON",
     "-DCVKIT_ENABLE_OPENVINO=OFF",
-    "-DCVKIT_ENABLE_TENSORRT=ON",
+    "-DCVKIT_ENABLE_TENSORRT=OFF",
   ],
   "clangd.arguments": [
     "--background-index",
@@ -56,3 +56,4 @@
     "editor.formatOnSave": true
   }
 }
+

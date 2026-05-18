@@ -18,7 +18,9 @@ namespace cvkit::examples
         const std::filesystem::path& image_path,
         const std::filesystem::path& output_dir,
         cvkit::media::ReaderBackend  reader_backend,
-        bool                         async_infer);
+        bool                         async_infer,
+        bool                         print_graph,
+        const std::filesystem::path& dump_graph_json_path);
 
     int run_video(
         cvkit::infer::Model&         model,
@@ -28,6 +30,8 @@ namespace cvkit::examples
         cvkit::media::ReaderBackend  reader_backend,
         cvkit::media::WriterBackend  writer_backend,
         cvkit::media::GstVideoCodec  gst_codec,
-        bool                         async_infer);
+        bool                         async_infer,
+        bool                         print_graph,
+        const std::filesystem::path& dump_graph_json_path);
 
 }  // namespace cvkit::examples

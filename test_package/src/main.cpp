@@ -18,12 +18,18 @@ int main()
 
     auto resized = cvkit::image::resize(frame, 320, 320);
 
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path = "demo.onnx";
+    spec.backend = cvkit::infer::Backend::none;
+    spec.task = cvkit::infer::TaskKind::detection;
+    spec.family = "yolo11";
+
     cvkit::infer::Model model;
-    if (!model.load("demo.onnx"))
+    if (!model.load(spec))
     {
         return 1;
     }
 
-    const auto detections = model.run(resized);
+    const auto detections = model.run_detection(resized);
     return detections.empty() ? 1 : 0;
 }

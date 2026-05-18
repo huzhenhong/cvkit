@@ -10,11 +10,11 @@ namespace cvkit::infer::detail
 {
 
     [[nodiscard]] std::vector<cvkit::core::Detection> postprocess_yolo_detections(
-        const RawTensorMap&               outputs,
-        const LetterboxResult&            preprocess,
-        const cvkit::core::Frame&         frame,
-        const std::vector<std::string>&   labels,
-        float                             confidence_threshold,
-        float                             iou_threshold);
+        const RawTensorMap&             outputs,
+        const LetterboxResult&          preprocess,
+        const cvkit::core::Frame&       frame,
+        const std::vector<std::string>& labels,
+        float                           confidence_threshold,
+        float                           iou_threshold);
 
 }  // namespace cvkit::infer::detail

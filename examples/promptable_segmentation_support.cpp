@@ -128,8 +128,8 @@ namespace cvkit::examples::promptable
         }
 
         const auto mask_count = static_cast<std::size_t>(tensor.shape[2]);
-        const auto height = static_cast<int>(tensor.shape[3]);
-        const auto width = static_cast<int>(tensor.shape[4]);
+        const auto height     = static_cast<int>(tensor.shape[3]);
+        const auto width      = static_cast<int>(tensor.shape[4]);
         if (mask_count == 0 || width <= 0 || height <= 0)
         {
             return {};
@@ -146,7 +146,7 @@ namespace cvkit::examples::promptable
         }
 
         const auto height = static_cast<int>(tensor.shape[1]);
-        const auto width = static_cast<int>(tensor.shape[2]);
+        const auto width  = static_cast<int>(tensor.shape[2]);
         if (width <= 0 || height <= 0)
         {
             return {};
@@ -156,10 +156,10 @@ namespace cvkit::examples::promptable
     }
 
     bool dump_graph_json(
-        const cvkit::infer::Model&        model,
-        bool                              async_infer,
-        Mode                              mode,
-        std::string_view                  embeddings_path,
+        const cvkit::infer::Model&   model,
+        bool                         async_infer,
+        Mode                         mode,
+        std::string_view             embeddings_path,
         const std::filesystem::path& path)
     {
         std::ostringstream extra;

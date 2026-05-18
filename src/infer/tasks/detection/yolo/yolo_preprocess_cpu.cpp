@@ -47,10 +47,10 @@ namespace cvkit::infer::detail
         const auto resized_w = std::max(1, static_cast<int>(std::round(src_w * scale)));
         const auto resized_h = std::max(1, static_cast<int>(std::round(src_h * scale)));
 
-        cv::Mat resized;
+        cv::Mat    resized;
         cv::resize(source, resized, cv::Size(resized_w, resized_h), 0.0, 0.0, cv::INTER_LINEAR);
 
-        cv::Mat canvas(input_h, input_w, resized.type(), cv::Scalar(114, 114, 114));
+        cv::Mat    canvas(input_h, input_w, resized.type(), cv::Scalar(114, 114, 114));
         const auto pad_x = (input_w - resized_w) / 2;
         const auto pad_y = (input_h - resized_h) / 2;
         resized.copyTo(canvas(cv::Rect(pad_x, pad_y, resized_w, resized_h)));

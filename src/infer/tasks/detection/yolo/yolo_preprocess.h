@@ -32,10 +32,10 @@ namespace cvkit::infer::detail
     struct YoloPreprocessSource
     {
         const cvkit::infer::ImageValue* image{nullptr};
-        YoloPreprocessPath         path{YoloPreprocessPath::unsupported};
-        const cvkit::core::Frame*  frame{nullptr};
-        MemoryDevice               memory_device{MemoryDevice::host};
-        DeviceRef                  device{};
+        YoloPreprocessPath              path{YoloPreprocessPath::unsupported};
+        const cvkit::core::Frame*       frame{nullptr};
+        MemoryDevice                    memory_device{MemoryDevice::host};
+        DeviceRef                       device{};
     };
 
     struct YoloPreprocessOutcome
@@ -45,7 +45,7 @@ namespace cvkit::infer::detail
         LetterboxResult      result{};
         std::string          error{};
 
-        [[nodiscard]] bool ok() const
+        [[nodiscard]] bool   ok() const
         {
             return status == YoloPreprocessStatus::ok && !result.tensor.data.empty();
         }
@@ -56,12 +56,12 @@ namespace cvkit::infer::detail
         if (const auto* image = input.find<cvkit::infer::ImageValue>("image"); image != nullptr)
         {
             YoloPreprocessSource source{};
-            source.image = image;
+            source.image         = image;
             source.memory_device = image->memory_device;
-            source.device = image->device;
+            source.device        = image->device;
             if (image->has_valid_host_layout())
             {
-                source.path = YoloPreprocessPath::host_cpu;
+                source.path  = YoloPreprocessPath::host_cpu;
                 source.frame = &image->frame;
                 return source;
             }
@@ -78,10 +78,10 @@ namespace cvkit::infer::detail
         if (const auto* frame = input.find<cvkit::core::Frame>("image"); frame != nullptr)
         {
             return YoloPreprocessSource{
-                .path = YoloPreprocessPath::host_cpu,
-                .frame = frame,
+                .path          = YoloPreprocessPath::host_cpu,
+                .frame         = frame,
                 .memory_device = MemoryDevice::host,
-                .device = {},
+                .device        = {},
             };
         }
 
@@ -116,7 +116,7 @@ namespace cvkit::infer::detail
                 if (outcome.source.image == nullptr)
                 {
                     outcome.status = YoloPreprocessStatus::unsupported_device_path;
-                    outcome.error = "cuda_device preprocess selected without a valid image input";
+                    outcome.error  = "cuda_device preprocess selected without a valid image input";
                     return outcome;
                 }
                 auto result = preprocess_yolo_cuda(

@@ -9,9 +9,9 @@ namespace ieaa
         class IPreprocess
         {
           public:
-            explicit IPreprocess(){};
+            explicit IPreprocess() {};
 
-            virtual ~IPreprocess(){};
+            virtual ~IPreprocess() {};
 
             virtual void Process(const unsigned char* src, unsigned char*& dst) = 0;
         };

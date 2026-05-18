@@ -64,12 +64,12 @@ namespace cvkit::infer
         }
 
         TensorFileHeaderV3 header{};
-        header.name_size = static_cast<std::uint32_t>(tensor.name.size());
-        header.rank = static_cast<std::uint32_t>(tensor.shape.size());
-        header.value_count = static_cast<std::uint64_t>(tensor.data.size());
-        header.data_type = static_cast<std::uint32_t>(tensor.data_type);
+        header.name_size     = static_cast<std::uint32_t>(tensor.name.size());
+        header.rank          = static_cast<std::uint32_t>(tensor.shape.size());
+        header.value_count   = static_cast<std::uint64_t>(tensor.data.size());
+        header.data_type     = static_cast<std::uint32_t>(tensor.data_type);
         header.memory_device = static_cast<std::uint32_t>(tensor.memory_device);
-        header.storage = static_cast<std::uint32_t>(tensor.storage);
+        header.storage       = static_cast<std::uint32_t>(tensor.storage);
 
         output.write(reinterpret_cast<const char*>(&header), sizeof(header));
         output.write(tensor.name.data(), static_cast<std::streamsize>(tensor.name.size()));
@@ -114,9 +114,9 @@ namespace cvkit::infer
             tensor.name.resize(header.name_size);
             tensor.shape.resize(header.rank);
             tensor.data.resize(static_cast<std::size_t>(header.value_count));
-            tensor.data_type = static_cast<TensorDataType>(header.data_type);
+            tensor.data_type     = static_cast<TensorDataType>(header.data_type);
             tensor.memory_device = static_cast<MemoryDevice>(header.memory_device);
-            tensor.storage = static_cast<StorageKind>(header.storage);
+            tensor.storage       = static_cast<StorageKind>(header.storage);
 
             input.read(tensor.name.data(), static_cast<std::streamsize>(tensor.name.size()));
             input.read(
@@ -140,9 +140,9 @@ namespace cvkit::infer
             tensor.name.resize(header.name_size);
             tensor.shape.resize(header.rank);
             tensor.data.resize(static_cast<std::size_t>(header.value_count));
-            tensor.data_type = static_cast<TensorDataType>(header.data_type);
+            tensor.data_type     = static_cast<TensorDataType>(header.data_type);
             tensor.memory_device = static_cast<MemoryDevice>(header.memory_device);
-            tensor.storage = StorageKind::owned;
+            tensor.storage       = StorageKind::owned;
 
             input.read(tensor.name.data(), static_cast<std::streamsize>(tensor.name.size()));
             input.read(
@@ -169,9 +169,9 @@ namespace cvkit::infer
         tensor.name.resize(header.name_size);
         tensor.shape.resize(header.rank);
         tensor.data.resize(static_cast<std::size_t>(header.value_count));
-        tensor.data_type = TensorDataType::float32;
+        tensor.data_type     = TensorDataType::float32;
         tensor.memory_device = MemoryDevice::host;
-        tensor.storage = StorageKind::owned;
+        tensor.storage       = StorageKind::owned;
 
         input.read(tensor.name.data(), static_cast<std::streamsize>(tensor.name.size()));
         input.read(

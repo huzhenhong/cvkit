@@ -56,7 +56,7 @@ namespace cvkit::infer
         }
 
         void append_json_tensor_info_array(
-            std::ostringstream& stream,
+            std::ostringstream&            stream,
             const std::vector<TensorInfo>& tensors)
         {
             stream << '[';
@@ -86,9 +86,9 @@ namespace cvkit::infer
         }
 
         void print_session_tensor_list(
-            std::ostream&                   stream,
-            std::string_view                label,
-            const std::vector<TensorInfo>&  tensors)
+            std::ostream&                  stream,
+            std::string_view               label,
+            const std::vector<TensorInfo>& tensors)
         {
             stream << label;
             for (std::size_t index = 0; index < tensors.size(); ++index)
@@ -213,7 +213,7 @@ namespace cvkit::infer
 
     void print_graph_info(std::ostream& stream, const Model& model)
     {
-        const auto graph = model.graph_info();
+        const auto graph   = model.graph_info();
         const auto session = model.session_info();
 
         stream << "graph.nodes=" << graph.nodes.size() << '\n';
@@ -312,9 +312,9 @@ namespace cvkit::infer
         bool             async_infer,
         std::string_view extra_fields_json)
     {
-        const auto graph = model.graph_info();
-        const auto trace = model.last_graph_trace();
-        const auto session = model.session_info();
+        const auto         graph   = model.graph_info();
+        const auto         trace   = model.last_graph_trace();
+        const auto         session = model.session_info();
 
         std::ostringstream stream;
         stream << "{\n";
@@ -329,7 +329,8 @@ namespace cvkit::infer
         stream << "  \"async\": " << (async_infer ? "true" : "false");
         if (!extra_fields_json.empty())
         {
-            stream << ",\n" << extra_fields_json;
+            stream << ",\n"
+                   << extra_fields_json;
         }
         else
         {

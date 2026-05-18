@@ -50,10 +50,10 @@ namespace cvkit::infer::detail
         return std::nullopt;
 #else
         cvkit::infer::TensorValue host_tensor = tensor;
-        host_tensor.memory_device = cvkit::infer::MemoryDevice::host;
-        host_tensor.storage = cvkit::infer::StorageKind::owned;
-        host_tensor.external_data = nullptr;
-        host_tensor.storage_bytes = 0U;
+        host_tensor.memory_device             = cvkit::infer::MemoryDevice::host;
+        host_tensor.storage                   = cvkit::infer::StorageKind::owned;
+        host_tensor.external_data             = nullptr;
+        host_tensor.storage_bytes             = 0U;
         host_tensor.storage_owner.reset();
         host_tensor.data.resize(tensor.element_count());
 

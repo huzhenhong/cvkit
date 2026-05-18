@@ -16,17 +16,17 @@ namespace cvkit::infer::detail
         TrtSession(TrtSession&&) noexcept;
         TrtSession& operator=(TrtSession&&) noexcept;
 
-        TrtSession(const TrtSession&) = delete;
-        TrtSession& operator=(const TrtSession&) = delete;
+        TrtSession(const TrtSession&)                  = delete;
+        TrtSession&       operator=(const TrtSession&) = delete;
 
-        bool                      load(const ModelSpec& spec) override;
-        [[nodiscard]] bool        ready() const override;
-        [[nodiscard]] Backend     backend() const override;
-        [[nodiscard]] const TensorInfo* input_info(std::size_t index = 0) const override;
-        [[nodiscard]] const TensorInfo* output_info(std::size_t index = 0) const override;
-        [[nodiscard]] RawTensorMap run(const RawTensorMap& inputs) const override;
-        [[nodiscard]] bool        supports_async() const override;
-        [[nodiscard]] BackendFuture run_async(const RawTensorMap& inputs) const override;
+        bool              load(const ModelSpec& spec) override;
+        bool              ready() const override;
+        Backend           backend() const override;
+        const TensorInfo* input_info(std::size_t index = 0) const override;
+        const TensorInfo* output_info(std::size_t index = 0) const override;
+        RawTensorMap      run(const RawTensorMap& inputs) const override;
+        bool              supports_async() const override;
+        BackendFuture     run_async(const RawTensorMap& inputs) const override;
 
       private:
         class Impl;

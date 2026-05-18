@@ -42,17 +42,17 @@ namespace cvkit::infer
 
     struct BK_INFER_EXPORT ModelSpec
     {
-        std::string                       model_path{};
-        std::string                       aux_model_path{};
-        std::string                       labels_path{};
-        std::string                       cache_dir{};
-        Backend                           backend{Backend::none};
-        TaskKind                          task{TaskKind::unknown};
-        CachePolicy                       cache_policy{CachePolicy::default_policy};
-        std::string                       family{};
-        DeviceRef                         device{};
-        std::vector<TensorRtProfileSpec>  tensorrt_profiles{};
-        bool                              tensorrt_prefer_device_outputs{false};
+        std::string                      model_path{};
+        std::string                      aux_model_path{};
+        std::string                      labels_path{};
+        std::string                      cache_dir{};
+        Backend                          backend{Backend::none};
+        TaskKind                         task{TaskKind::unknown};
+        CachePolicy                      cache_policy{CachePolicy::default_policy};
+        std::string                      family{};
+        DeviceRef                        device{};
+        std::vector<TensorRtProfileSpec> tensorrt_profiles{};
+        bool                             tensorrt_prefer_device_outputs{false};
     };
 
     struct BK_INFER_EXPORT GraphNodeInfo
@@ -101,23 +101,23 @@ namespace cvkit::infer
 
         bool                                              load(const ModelSpec& spec);
         bool                                              load_labels(std::string labels_path);
-        [[nodiscard]] bool                                loaded() const;
-        [[nodiscard]] Backend                             backend() const;
-        [[nodiscard]] TaskKind                            task() const;
-        [[nodiscard]] TaskSchema                          schema() const;
-        [[nodiscard]] SessionInfo                         session_info() const;
-        [[nodiscard]] GraphInfo                           graph_info() const;
-        [[nodiscard]] std::vector<GraphTraceInfo>         last_graph_trace() const;
-        [[nodiscard]] std::string_view                    model_path() const;
-        [[nodiscard]] std::string_view                    aux_model_path() const;
-        [[nodiscard]] std::string_view                    labels_path() const;
-        [[nodiscard]] std::string_view                    family() const;
-        [[nodiscard]] std::string_view                    cache_dir() const;
-        [[nodiscard]] CachePolicy                         cache_policy() const;
+        bool                                              loaded() const;
+        Backend                                           backend() const;
+        TaskKind                                          task() const;
+        TaskSchema                                        schema() const;
+        SessionInfo                                       session_info() const;
+        GraphInfo                                         graph_info() const;
+        std::vector<GraphTraceInfo>                       last_graph_trace() const;
+        std::string_view                                  model_path() const;
+        std::string_view                                  aux_model_path() const;
+        std::string_view                                  labels_path() const;
+        std::string_view                                  family() const;
+        std::string_view                                  cache_dir() const;
+        CachePolicy                                       cache_policy() const;
         void                                              set_confidence_threshold(float threshold);
-        [[nodiscard]] float                               confidence_threshold() const;
+        float                                             confidence_threshold() const;
         void                                              set_iou_threshold(float threshold);
-        [[nodiscard]] float                               iou_threshold() const;
+        float                                             iou_threshold() const;
         [[nodiscard]] TaskOutput                          run_sync(const TaskInput& input) const;
         [[nodiscard]] TaskFuture                          submit(const TaskInput& input) const;
         [[nodiscard]] std::vector<cvkit::core::Detection> run_detection(const cvkit::core::Frame& frame) const;

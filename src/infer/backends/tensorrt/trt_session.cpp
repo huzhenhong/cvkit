@@ -24,7 +24,7 @@ namespace cvkit::infer::detail
     namespace
     {
 
-        template <typename T>
+        template<typename T>
         struct TrtDestroy
         {
             void operator()(T* ptr) const
@@ -71,8 +71,8 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] const TensorRtProfileSpec* find_profile_spec(
-            std::string_view                            input_name,
-            const std::vector<TensorRtProfileSpec>&     profiles)
+            std::string_view                        input_name,
+            const std::vector<TensorRtProfileSpec>& profiles)
         {
             const auto normalized = to_lower(input_name);
             for (const auto& profile : profiles)
@@ -150,14 +150,14 @@ namespace cvkit::infer::detail
                     return TensorDataType::float16;
                 case nvinfer1::DataType::kINT32:
                     return TensorDataType::int32;
-#if NV_TENSORRT_MAJOR >= 10
+    #if NV_TENSORRT_MAJOR >= 10
                 case nvinfer1::DataType::kINT64:
                     return TensorDataType::int64;
                 case nvinfer1::DataType::kUINT8:
                     return TensorDataType::uint8;
                 case nvinfer1::DataType::kBOOL:
                     return TensorDataType::boolean;
-#endif
+    #endif
                 default:
                     return TensorDataType::unknown;
             }
@@ -183,13 +183,13 @@ namespace cvkit::infer::detail
         };
 
         [[nodiscard]] int32_t resolve_dynamic_dim(
-            std::string_view       input_name,
-            const ModelSpec&       spec,
-            int                    nb_dims,
-            int                    dim_index,
-            ProfilePreset          preset)
+            std::string_view input_name,
+            const ModelSpec& spec,
+            int              nb_dims,
+            int              dim_index,
+            ProfilePreset    preset)
         {
-            const auto name = to_lower(input_name);
+            const auto name          = to_lower(input_name);
             const auto spatial_value = [preset](int min_value, int opt_value, int max_value)
             {
                 switch (preset)
@@ -278,10 +278,10 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] nvinfer1::Dims profile_dims_for_input(
-            std::string_view       input_name,
-            const nvinfer1::Dims&  dims,
-            const ModelSpec&       spec,
-            ProfilePreset          preset)
+            std::string_view      input_name,
+            const nvinfer1::Dims& dims,
+            const ModelSpec&      spec,
+            ProfilePreset         preset)
         {
             if (const auto* profile = find_profile_spec(input_name, spec.tensorrt_profiles); profile != nullptr)
             {
@@ -324,7 +324,7 @@ namespace cvkit::infer::detail
 
         struct StreamGuard
         {
-            cudaStream_t stream{};
+            cudaStream_t       stream{};
 
             [[nodiscard]] bool create()
             {
@@ -388,10 +388,10 @@ namespace cvkit::infer::detail
 
         [[nodiscard]] std::string model_fingerprint(const std::filesystem::path& model_path)
         {
-            std::error_code ec;
-            const auto      abs_path = std::filesystem::absolute(model_path, ec).string();
-            const auto      size     = std::filesystem::file_size(model_path, ec);
-            const auto      mtime    = std::filesystem::last_write_time(model_path, ec).time_since_epoch().count();
+            std::error_code    ec;
+            const auto         abs_path = std::filesystem::absolute(model_path, ec).string();
+            const auto         size     = std::filesystem::file_size(model_path, ec);
+            const auto         mtime    = std::filesystem::last_write_time(model_path, ec).time_since_epoch().count();
 
             std::ostringstream material;
             material << abs_path << '|' << size << '|' << mtime;
@@ -426,9 +426,7 @@ namespace cvkit::infer::detail
             const std::filesystem::path& model_path,
             const ModelSpec&             spec)
         {
-            auto cache_dir = spec.cache_dir.empty()
-                                 ? model_path.parent_path() / ".cvkit_cache" / "tensorrt"
-                                 : std::filesystem::path(spec.cache_dir);
+            auto            cache_dir = spec.cache_dir.empty() ? model_path.parent_path() / ".cvkit_cache" / "tensorrt" : std::filesystem::path(spec.cache_dir);
             std::error_code ec;
             std::filesystem::create_directories(cache_dir, ec);
             return cache_dir;
@@ -440,10 +438,7 @@ namespace cvkit::infer::detail
         {
             const auto cache_dir = cache_root(model_path, spec);
 
-            return cache_dir
-                   / (model_path.stem().string() + "."
-                      + model_fingerprint(model_path) + "."
-                      + runtime_fingerprint() + ".plan");
+            return cache_dir / (model_path.stem().string() + "." + model_fingerprint(model_path) + "." + runtime_fingerprint() + ".plan");
         }
 
         [[nodiscard]] bool is_cache_fresh(
@@ -548,9 +543,9 @@ namespace cvkit::infer::detail
                 }
 
                 TensorInfo info{};
-                info.name  = name;
-                info.shape = dims_to_shape(engine.getTensorShape(name));
-                info.data_type = trt_data_type(engine.getTensorDataType(name));
+                info.name          = name;
+                info.shape         = dims_to_shape(engine.getTensorShape(name));
+                info.data_type     = trt_data_type(engine.getTensorDataType(name));
                 info.memory_device = MemoryDevice::host;
 
                 switch (engine.getTensorIOMode(name))
@@ -573,13 +568,13 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] bool bind_engine_tensors(
-            nvinfer1::ICudaEngine&        engine,
-            nvinfer1::IExecutionContext&  context,
-            const RawTensorMap&           inputs,
-            DeviceBuffers&                device_buffers,
-            cudaStream_t                  stream)
+            nvinfer1::ICudaEngine&       engine,
+            nvinfer1::IExecutionContext& context,
+            const RawTensorMap&          inputs,
+            DeviceBuffers&               device_buffers,
+            cudaStream_t                 stream)
         {
-            const auto io_count = engine.getNbIOTensors();
+            const auto  io_count = engine.getNbIOTensors();
 
             std::size_t input_index = 0;
             for (int i = 0; i < io_count; ++i)
@@ -698,8 +693,8 @@ namespace cvkit::infer::detail
                 }
 
                 RawTensor output{};
-                output.name  = output_info.name;
-                output.shape = shape;
+                output.name      = output_info.name;
+                output.shape     = shape;
                 output.data_type = output_info.data_type;
                 if (prefer_device_outputs)
                 {
@@ -738,29 +733,29 @@ namespace cvkit::infer::detail
     {
       public:
 #if defined(CVKIT_WITH_TENSORRT)
-        TrtLogger logger{};
-        std::unique_ptr<nvinfer1::IBuilder, TrtDestroy<nvinfer1::IBuilder>> builder{};
+        TrtLogger                                                                               logger{};
+        std::unique_ptr<nvinfer1::IBuilder, TrtDestroy<nvinfer1::IBuilder>>                     builder{};
         std::unique_ptr<nvinfer1::INetworkDefinition, TrtDestroy<nvinfer1::INetworkDefinition>> network{};
-        std::unique_ptr<nvonnxparser::IParser, TrtDestroy<nvonnxparser::IParser>> parser{};
-        std::unique_ptr<nvinfer1::IBuilderConfig, TrtDestroy<nvinfer1::IBuilderConfig>> config{};
-        std::unique_ptr<nvinfer1::IHostMemory, TrtDestroy<nvinfer1::IHostMemory>> plan{};
-        std::unique_ptr<nvinfer1::IRuntime, TrtDestroy<nvinfer1::IRuntime>> runtime{};
-        std::unique_ptr<nvinfer1::ICudaEngine, TrtDestroy<nvinfer1::ICudaEngine>> engine{};
-        std::unique_ptr<nvinfer1::IExecutionContext, TrtDestroy<nvinfer1::IExecutionContext>> context{};
-        StreamGuard execution_stream{};
-        mutable std::mutex execution_mutex{};
+        std::unique_ptr<nvonnxparser::IParser, TrtDestroy<nvonnxparser::IParser>>               parser{};
+        std::unique_ptr<nvinfer1::IBuilderConfig, TrtDestroy<nvinfer1::IBuilderConfig>>         config{};
+        std::unique_ptr<nvinfer1::IHostMemory, TrtDestroy<nvinfer1::IHostMemory>>               plan{};
+        std::unique_ptr<nvinfer1::IRuntime, TrtDestroy<nvinfer1::IRuntime>>                     runtime{};
+        std::unique_ptr<nvinfer1::ICudaEngine, TrtDestroy<nvinfer1::ICudaEngine>>               engine{};
+        std::unique_ptr<nvinfer1::IExecutionContext, TrtDestroy<nvinfer1::IExecutionContext>>   context{};
+        StreamGuard                                                                             execution_stream{};
+        mutable std::mutex                                                                      execution_mutex{};
         ModelSpec                                                                               spec{};
 
-        void reset_runtime_state();
-        [[nodiscard]] bool create_runtime();
-        [[nodiscard]] bool try_restore_engine_from_cache(
+        void                                                                                    reset_runtime_state();
+        [[nodiscard]] bool                                                                      create_runtime();
+        [[nodiscard]] bool                                                                      try_restore_engine_from_cache(
             const std::filesystem::path& model_path,
             const ModelSpec&             spec);
         [[nodiscard]] bool build_engine_from_onnx(
             const std::filesystem::path& model_path,
             const ModelSpec&             spec);
-        [[nodiscard]] bool configure_optimization_profiles(const ModelSpec& spec);
-        [[nodiscard]] bool create_execution_context();
+        [[nodiscard]] bool         configure_optimization_profiles(const ModelSpec& spec);
+        [[nodiscard]] bool         create_execution_context();
         [[nodiscard]] RawTensorMap run_sync(const RawTensorMap& inputs) const;
 #endif
         std::vector<TensorInfo> input_infos{};
@@ -812,9 +807,7 @@ namespace cvkit::infer::detail
                 continue;
             }
 
-            if (spec.cache_policy != CachePolicy::read_only
-                && !caches.empty()
-                && cache_path != caches.front())
+            if (spec.cache_policy != CachePolicy::read_only && !caches.empty() && cache_path != caches.front())
             {
                 std::error_code ec;
                 std::filesystem::copy_file(
@@ -882,8 +875,7 @@ namespace cvkit::infer::detail
             return false;
         }
 
-        if (spec.cache_policy != CachePolicy::disabled
-            && spec.cache_policy != CachePolicy::read_only)
+        if (spec.cache_policy != CachePolicy::disabled && spec.cache_policy != CachePolicy::read_only)
         {
             write_binary_file(
                 fingerprinted_engine_cache_path(model_path, spec),
@@ -948,9 +940,7 @@ namespace cvkit::infer::detail
             const auto opt_dims = profile_dims_for_input(name, dims, spec, ProfilePreset::opt);
             const auto max_dims = profile_dims_for_input(name, dims, spec, ProfilePreset::max);
 
-            if (!profile->setDimensions(name, nvinfer1::OptProfileSelector::kMIN, min_dims)
-                || !profile->setDimensions(name, nvinfer1::OptProfileSelector::kOPT, opt_dims)
-                || !profile->setDimensions(name, nvinfer1::OptProfileSelector::kMAX, max_dims))
+            if (!profile->setDimensions(name, nvinfer1::OptProfileSelector::kMIN, min_dims) || !profile->setDimensions(name, nvinfer1::OptProfileSelector::kOPT, opt_dims) || !profile->setDimensions(name, nvinfer1::OptProfileSelector::kMAX, max_dims))
             {
                 return false;
             }
@@ -988,7 +978,7 @@ namespace cvkit::infer::detail
 
     RawTensorMap TrtSession::Impl::run_sync(const RawTensorMap& inputs) const
     {
-        RawTensorMap outputs{};
+        RawTensorMap                outputs{};
         std::lock_guard<std::mutex> lock(execution_mutex);
 
         if (!ready || !engine || !context || inputs.empty())
@@ -1001,7 +991,7 @@ namespace cvkit::infer::detail
             return outputs;
         }
 
-        const auto io_count = engine->getNbIOTensors();
+        const auto io_count       = engine->getNbIOTensors();
         auto       device_buffers = std::make_shared<DeviceBuffers>();
         device_buffers->reserve(static_cast<std::size_t>(io_count));
         if (!bind_engine_tensors(*engine, *context, inputs, *device_buffers, execution_stream.stream))
@@ -1044,7 +1034,7 @@ namespace cvkit::infer::detail
     TrtSession::TrtSession(TrtSession&&) noexcept            = default;
     TrtSession& TrtSession::operator=(TrtSession&&) noexcept = default;
 
-    bool TrtSession::load(const ModelSpec& spec)
+    bool        TrtSession::load(const ModelSpec& spec)
     {
         impl_->ready = false;
         impl_->input_infos.clear();
@@ -1067,8 +1057,7 @@ namespace cvkit::infer::detail
             }
 
             const std::filesystem::path model_path{spec.model_path};
-            if (!impl_->try_restore_engine_from_cache(model_path, spec)
-                && !impl_->build_engine_from_onnx(model_path, spec))
+            if (!impl_->try_restore_engine_from_cache(model_path, spec) && !impl_->build_engine_from_onnx(model_path, spec))
             {
                 return false;
             }
@@ -1145,15 +1134,15 @@ namespace cvkit::infer::detail
     BackendFuture TrtSession::run_async(const RawTensorMap& inputs) const
     {
 #if defined(CVKIT_WITH_TENSORRT)
-        auto impl = impl_;
+        auto impl          = impl_;
         auto copied_inputs = inputs;
-        auto future = std::async(
-                          std::launch::async,
-                          [impl = std::move(impl), copied_inputs = std::move(copied_inputs)]() mutable
-                          {
+        auto future        = std::async(
+                                 std::launch::async,
+                                 [impl = std::move(impl), copied_inputs = std::move(copied_inputs)]() mutable
+                                 {
                               return impl->run_sync(copied_inputs);
-                          })
-                          .share();
+                                 })
+                                 .share();
         return BackendFuture{std::move(future)};
 #else
         static_cast<void>(inputs);

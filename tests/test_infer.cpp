@@ -26,9 +26,9 @@ namespace
     {
       public:
         explicit TestNode(
-            std::string_view           node_name,
-            std::vector<std::string>   consumes = {},
-            std::vector<std::string>   produces = {})
+            std::string_view         node_name,
+            std::vector<std::string> consumes = {},
+            std::vector<std::string> produces = {})
             : name_(node_name)
             , consumes_(std::move(consumes))
             , produces_(std::move(produces))
@@ -58,7 +58,7 @@ namespace
         }
 
       private:
-        std::string name_{};
+        std::string              name_{};
         std::vector<std::string> consumes_{};
         std::vector<std::string> produces_{};
     };
@@ -245,12 +245,12 @@ namespace
 
 TEST_CASE("model load fails for missing onnx file")
 {
-    cvkit::infer::Model model;
+    cvkit::infer::Model     model;
     cvkit::infer::ModelSpec spec{};
     spec.model_path = "missing.onnx";
-    spec.backend = cvkit::infer::Backend::none;
-    spec.task = cvkit::infer::TaskKind::detection;
-    spec.family = "yolo11";
+    spec.backend    = cvkit::infer::Backend::none;
+    spec.task       = cvkit::infer::TaskKind::detection;
+    spec.family     = "yolo11";
     CHECK_FALSE(model.load(spec));
     CHECK_FALSE(model.loaded());
 }
@@ -300,9 +300,9 @@ TEST_CASE("model session_info exposes backend tensor metadata for yolo model")
 
     cvkit::infer::ModelSpec spec{};
     spec.model_path = model_path.string();
-    spec.backend = backend;
-    spec.task = cvkit::infer::TaskKind::detection;
-    spec.family = "yolo11";
+    spec.backend    = backend;
+    spec.task       = cvkit::infer::TaskKind::detection;
+    spec.family     = "yolo11";
 
     cvkit::infer::Model model;
     REQUIRE(model.load(spec));
@@ -316,14 +316,14 @@ TEST_CASE("model session_info exposes backend tensor metadata for yolo model")
 
 TEST_CASE("tensor file round-trip preserves tensor metadata and values")
 {
-    const auto temp_dir = std::filesystem::temp_directory_path() / "cvkit_tensor_io";
-    const auto tensor_path = temp_dir / "tensor.bin";
+    const auto                temp_dir    = std::filesystem::temp_directory_path() / "cvkit_tensor_io";
+    const auto                tensor_path = temp_dir / "tensor.bin";
 
     cvkit::infer::TensorValue saved{};
-    saved.name = "image_embeddings";
-    saved.shape = {1, 256, 64, 64};
-    saved.data = {0.25F, -0.5F, 1.0F, 2.5F};
-    saved.data_type = cvkit::infer::TensorDataType::float32;
+    saved.name          = "image_embeddings";
+    saved.shape         = {1, 256, 64, 64};
+    saved.data          = {0.25F, -0.5F, 1.0F, 2.5F};
+    saved.data_type     = cvkit::infer::TensorDataType::float32;
     saved.memory_device = cvkit::infer::MemoryDevice::host;
 
     REQUIRE(cvkit::infer::save_tensor_file(saved, tensor_path));
@@ -342,10 +342,10 @@ TEST_CASE("tensor file round-trip preserves tensor metadata and values")
 TEST_CASE("task input and output support richer infer value types")
 {
     cvkit::core::Frame image_frame{};
-    image_frame.desc.width = 4;
-    image_frame.desc.height = 3;
+    image_frame.desc.width    = 4;
+    image_frame.desc.height   = 3;
     image_frame.desc.channels = 3;
-    image_frame.desc.format = cvkit::core::PixelFormat::bgr8;
+    image_frame.desc.format   = cvkit::core::PixelFormat::bgr8;
     image_frame.data.assign(static_cast<std::size_t>(4 * 3 * 3), static_cast<std::uint8_t>(7));
 
     cvkit::infer::TaskInput input{};
@@ -353,8 +353,8 @@ TEST_CASE("task input and output support richer infer value types")
     input.add("boxes", cvkit::infer::BoxListValue{{cvkit::core::BBox{1.0F, 2.0F, 3.0F, 4.0F}}});
     input.add("keypoints", cvkit::infer::KeypointsValue{{cvkit::core::Point2f{5.0F, 6.0F}}});
 
-    const auto* image = input.find<cvkit::infer::ImageValue>("image");
-    const auto* boxes = input.find<cvkit::infer::BoxListValue>("boxes");
+    const auto* image     = input.find<cvkit::infer::ImageValue>("image");
+    const auto* boxes     = input.find<cvkit::infer::BoxListValue>("boxes");
     const auto* keypoints = input.find<cvkit::infer::KeypointsValue>("keypoints");
     REQUIRE(image != nullptr);
     REQUIRE(boxes != nullptr);
@@ -369,7 +369,7 @@ TEST_CASE("task input and output support richer infer value types")
     CHECK(image->is_packed());
     CHECK(image->has_valid_host_layout());
 
-    auto padded_image = *image;
+    auto padded_image             = *image;
     padded_image.row_stride_bytes = 16;
     CHECK(padded_image.effective_row_stride_bytes() == 16);
     CHECK_FALSE(padded_image.is_packed());
@@ -393,9 +393,9 @@ TEST_CASE("task input and output support richer infer value types")
     CHECK(stored_classification->label == "dog");
 
     cvkit::infer::TensorValue tensor{};
-    tensor.name = "host_tensor";
+    tensor.name  = "host_tensor";
     tensor.shape = {1, 4};
-    tensor.data = {1.0F, 2.0F, 3.0F, 4.0F};
+    tensor.data  = {1.0F, 2.0F, 3.0F, 4.0F};
     CHECK(tensor.data_type == cvkit::infer::TensorDataType::float32);
     CHECK(tensor.memory_device == cvkit::infer::MemoryDevice::host);
     CHECK(tensor.storage == cvkit::infer::StorageKind::owned);
@@ -428,18 +428,18 @@ TEST_CASE("task input and output support richer infer value types")
     CHECK_FALSE(device_tensor.has_valid_host_layout());
 
     cvkit::infer::ImageValue device_image = *image;
-    device_image.memory_device = cvkit::infer::MemoryDevice::cuda;
-    device_image.storage = cvkit::infer::StorageKind::external_view;
-    device_image.external_data = reinterpret_cast<const void*>(0x1);
-    device_image.storage_bytes = image->frame.data.size();
+    device_image.memory_device            = cvkit::infer::MemoryDevice::cuda;
+    device_image.storage                  = cvkit::infer::StorageKind::external_view;
+    device_image.external_data            = reinterpret_cast<const void*>(0x1);
+    device_image.storage_bytes            = image->frame.data.size();
     device_image.frame.data.clear();
     CHECK(device_image.has_valid_device_view());
     CHECK_FALSE(device_image.has_valid_host_layout());
 
     cvkit::infer::TaskOutput output{};
-    cvkit::core::Frame mask_frame{};
-    mask_frame.desc.width = 8;
-    mask_frame.desc.height = 6;
+    cvkit::core::Frame       mask_frame{};
+    mask_frame.desc.width    = 8;
+    mask_frame.desc.height   = 6;
     mask_frame.desc.channels = 1;
     mask_frame.data.assign(static_cast<std::size_t>(8 * 6), static_cast<std::uint8_t>(255));
     output.add("mask", cvkit::infer::MaskValue{mask_frame});
@@ -487,16 +487,16 @@ TEST_CASE("classification pipeline returns top1 label and scores")
 TEST_CASE("backend input tensor contract currently requires host float32 tensors")
 {
     cvkit::infer::detail::RawTensor tensor{};
-    tensor.name = "input";
+    tensor.name  = "input";
     tensor.shape = {1, 3, 4, 4};
-    tensor.data = std::vector<float>(48, 1.0F);
+    tensor.data  = std::vector<float>(48, 1.0F);
 
     CHECK(cvkit::infer::detail::is_supported_backend_input_tensor(tensor));
 
     tensor.data_type = cvkit::infer::TensorDataType::float16;
     CHECK_FALSE(cvkit::infer::detail::is_supported_backend_input_tensor(tensor));
 
-    tensor.data_type = cvkit::infer::TensorDataType::float32;
+    tensor.data_type     = cvkit::infer::TensorDataType::float32;
     tensor.memory_device = cvkit::infer::MemoryDevice::cuda;
     CHECK_FALSE(cvkit::infer::detail::is_supported_backend_input_tensor(tensor));
 
@@ -512,8 +512,8 @@ TEST_CASE("backend input tensor contract currently requires host float32 tensors
 TEST_CASE("yolo preprocess source selection distinguishes host and cuda image inputs")
 {
     cvkit::core::Frame frame{};
-    frame.desc.width = 4;
-    frame.desc.height = 3;
+    frame.desc.width    = 4;
+    frame.desc.height   = 3;
     frame.desc.channels = 3;
     frame.data.assign(static_cast<std::size_t>(4 * 3 * 3), static_cast<std::uint8_t>(9));
 
@@ -525,10 +525,10 @@ TEST_CASE("yolo preprocess source selection distinguishes host and cuda image in
     CHECK(host_source.memory_device == cvkit::infer::MemoryDevice::host);
 
     cvkit::infer::ImageValue cuda_image{};
-    cuda_image.frame = frame;
+    cuda_image.frame         = frame;
     cuda_image.memory_device = cvkit::infer::MemoryDevice::cuda;
-    cuda_image.device = {cvkit::infer::DeviceKind::cuda, 0};
-    cuda_image.storage = cvkit::infer::StorageKind::external_view;
+    cuda_image.device        = {cvkit::infer::DeviceKind::cuda, 0};
+    cuda_image.storage       = cvkit::infer::StorageKind::external_view;
     cuda_image.external_data = reinterpret_cast<const void*>(0x1);
     cuda_image.storage_bytes = static_cast<std::size_t>(4 * 3 * 3);
 
@@ -600,7 +600,7 @@ TEST_CASE("task graph honors explicit node dependencies")
     CHECK(metadata[2].depends_on == std::vector<std::string>{"start"});
 
     cvkit::infer::detail::Packet packet{};
-    const auto result = graph.run_sync(std::move(packet));
+    const auto                   result = graph.run_sync(std::move(packet));
 
     REQUIRE(result.trace.size() == 3);
     CHECK(result.trace[0].name == "start");
@@ -673,7 +673,7 @@ TEST_CASE("task graph trace records node error messages")
     cvkit::infer::detail::TaskGraph graph{};
     graph.add_node(std::make_shared<ErrorTraceNode>("error_node"));
     cvkit::infer::detail::Packet packet{};
-    const auto result = graph.run_sync(std::move(packet));
+    const auto                   result = graph.run_sync(std::move(packet));
     REQUIRE(result.trace.size() == 1);
     CHECK(result.trace[0].name == "error_node");
     CHECK_FALSE(result.trace[0].ok);
@@ -731,7 +731,7 @@ TEST_CASE("model submit runs inference asynchronously and returns detections")
     cvkit::infer::TaskInput input{};
     input.add("image", frame);
 
-    const auto sync_output = model.run_sync(input);
+    const auto  sync_output     = model.run_sync(input);
     const auto* sync_detections = sync_output.find<std::vector<cvkit::core::Detection>>("detections");
     REQUIRE(sync_detections != nullptr);
     REQUIRE_FALSE(sync_detections->empty());
@@ -740,7 +740,7 @@ TEST_CASE("model submit runs inference asynchronously and returns detections")
     REQUIRE(future.valid());
     CHECK(future.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
 
-    const auto async_output = future.get();
+    const auto  async_output     = future.get();
     const auto* async_detections = async_output.find<std::vector<cvkit::core::Detection>>("detections");
     REQUIRE(async_detections != nullptr);
     CHECK(async_detections->size() == sync_detections->size());
@@ -764,11 +764,11 @@ TEST_CASE("model submit uses TensorRT backend asynchronously for yolo detection"
     REQUIRE(std::filesystem::exists(image_path));
 
     cvkit::infer::ModelSpec spec{};
-    spec.model_path = model_path.string();
-    spec.labels_path = labels_path.string();
-    spec.backend = cvkit::infer::Backend::tensorrt;
-    spec.task = cvkit::infer::TaskKind::detection;
-    spec.family = "yolo11";
+    spec.model_path   = model_path.string();
+    spec.labels_path  = labels_path.string();
+    spec.backend      = cvkit::infer::Backend::tensorrt;
+    spec.task         = cvkit::infer::TaskKind::detection;
+    spec.family       = "yolo11";
     spec.cache_policy = cvkit::infer::CachePolicy::default_policy;
     spec.tensorrt_profiles.push_back({
         "images",
@@ -802,7 +802,7 @@ TEST_CASE("model submit uses TensorRT backend asynchronously for yolo detection"
     REQUIRE(future.valid());
     CHECK(future.wait_for(std::chrono::seconds(10)) == std::future_status::ready);
 
-    const auto output = future.get();
+    const auto  output     = future.get();
     const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
     REQUIRE(detections != nullptr);
     REQUIRE_FALSE(detections->empty());
@@ -824,17 +824,17 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
     REQUIRE(std::filesystem::exists(image_path));
 
     cvkit::infer::Backend backend = cvkit::infer::Backend::none;
-#if defined(CVKIT_WITH_ONNXRUNTIME)
+    #if defined(CVKIT_WITH_ONNXRUNTIME)
     backend = cvkit::infer::Backend::onnxruntime;
-#elif defined(CVKIT_WITH_TENSORRT)
+    #elif defined(CVKIT_WITH_TENSORRT)
     if (std::getenv("CVKIT_RUN_TENSORRT_SMOKE") == nullptr)
     {
         SKIP("set CVKIT_RUN_TENSORRT_SMOKE=1 to validate cuda image input through TensorRT");
     }
     backend = cvkit::infer::Backend::tensorrt;
-#else
+    #else
     SKIP("no inference backend is enabled in this build");
-#endif
+    #endif
 
     cvkit::infer::ModelSpec spec{};
     spec.model_path  = model_path.string();
@@ -842,7 +842,7 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
     spec.backend     = backend;
     spec.task        = cvkit::infer::TaskKind::detection;
     spec.family      = "yolo11";
-#if defined(CVKIT_WITH_TENSORRT)
+    #if defined(CVKIT_WITH_TENSORRT)
     if (backend == cvkit::infer::Backend::tensorrt)
     {
         spec.tensorrt_profiles.push_back({
@@ -855,7 +855,7 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
                 },
         });
     }
-#endif
+    #endif
 
     cvkit::infer::Model model;
     REQUIRE(model.load(spec));
@@ -863,7 +863,7 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
     const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
     REQUIRE_FALSE(image.empty());
 
-    unsigned char* device_image = nullptr;
+    unsigned char* device_image  = nullptr;
     const auto     storage_bytes = static_cast<std::size_t>(image.step) * static_cast<std::size_t>(image.rows);
     REQUIRE(cudaMalloc(reinterpret_cast<void**>(&device_image), storage_bytes) == cudaSuccess);
 
@@ -911,11 +911,11 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
 
     cvkit::infer::TaskInput host_input{};
     host_input.add("image", cvkit::infer::ImageValue{frame});
-    const auto host_output = model.run_sync(host_input);
+    const auto  host_output     = model.run_sync(host_input);
     const auto* host_detections = host_output.find<std::vector<cvkit::core::Detection>>("detections");
     REQUIRE(host_detections != nullptr);
 
-    const auto output = model.run_sync(input);
+    const auto  output     = model.run_sync(input);
     const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
     REQUIRE(detections != nullptr);
     CHECK(detections->size() == host_detections->size());
@@ -931,10 +931,10 @@ TEST_CASE("model run_sync accepts cuda image input for yolo detection")
 
 TEST_CASE("promptable segmentation runs efficient_sam encoder and decoder and returns mask")
 {
-    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto source_root  = std::filesystem::path(__FILE__).parent_path().parent_path();
     const auto encoder_path = source_root / "assets" / "models" / "efficient_sam_vitt_encoder.sim.onnx";
     const auto decoder_path = source_root / "assets" / "models" / "efficient_sam_vitt_decoder.sim.onnx";
-    const auto image_path = source_root / "assets" / "images" / "test_001.jpg";
+    const auto image_path   = source_root / "assets" / "images" / "test_001.jpg";
 
     if (!std::filesystem::exists(encoder_path) || !std::filesystem::exists(decoder_path))
     {
@@ -943,11 +943,11 @@ TEST_CASE("promptable segmentation runs efficient_sam encoder and decoder and re
     REQUIRE(std::filesystem::exists(image_path));
 
     cvkit::infer::ModelSpec spec{};
-    spec.model_path = encoder_path.string();
+    spec.model_path     = encoder_path.string();
     spec.aux_model_path = decoder_path.string();
-    spec.backend = cvkit::infer::Backend::onnxruntime;
-    spec.task = cvkit::infer::TaskKind::promptable_segmentation;
-    spec.family = "efficient_sam";
+    spec.backend        = cvkit::infer::Backend::onnxruntime;
+    spec.task           = cvkit::infer::TaskKind::promptable_segmentation;
+    spec.family         = "efficient_sam";
 
     cvkit::infer::Model model;
     if (!model.load(spec))
@@ -961,11 +961,11 @@ TEST_CASE("promptable segmentation runs efficient_sam encoder and decoder and re
     REQUIRE_FALSE(image.empty());
 
     cvkit::core::Frame frame{};
-    frame.desc.width = image.cols;
-    frame.desc.height = image.rows;
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
     frame.desc.channels = image.channels();
-    frame.desc.format = cvkit::core::PixelFormat::bgr8;
-    frame.source = image_path.string();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
     frame.data.assign(image.data, image.data + image.total() * image.elemSize());
 
     cvkit::infer::TaskInput input{};
@@ -973,11 +973,11 @@ TEST_CASE("promptable segmentation runs efficient_sam encoder and decoder and re
     input.add("points", std::vector<cvkit::core::Point2f>{{image.cols * 0.5F, image.rows * 0.5F}});
     input.add("point_labels", std::vector<float>{1.0F});
 
-    const auto output = model.run_sync(input);
-    const auto* mask = output.find<cvkit::infer::MaskValue>("mask");
+    const auto  output        = model.run_sync(input);
+    const auto* mask          = output.find<cvkit::infer::MaskValue>("mask");
     const auto* low_res_masks = output.find<cvkit::infer::TensorValue>("low_res_masks");
-    const auto* logits = output.find<cvkit::infer::TensorValue>("logits");
-    const auto* scores = output.find<std::vector<float>>("scores");
+    const auto* logits        = output.find<cvkit::infer::TensorValue>("logits");
+    const auto* scores        = output.find<std::vector<float>>("scores");
     REQUIRE(mask != nullptr);
     REQUIRE(low_res_masks != nullptr);
     REQUIRE(logits != nullptr);
@@ -995,9 +995,9 @@ TEST_CASE("promptable segmentation runs efficient_sam encoder and decoder and re
 
 TEST_CASE("promptable segmentation encoder-only returns image embeddings")
 {
-    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto source_root  = std::filesystem::path(__FILE__).parent_path().parent_path();
     const auto encoder_path = source_root / "assets" / "models" / "efficient_sam_vitt_encoder.sim.onnx";
-    const auto image_path = source_root / "assets" / "images" / "test_001.jpg";
+    const auto image_path   = source_root / "assets" / "images" / "test_001.jpg";
 
     if (!std::filesystem::exists(encoder_path))
     {
@@ -1007,9 +1007,9 @@ TEST_CASE("promptable segmentation encoder-only returns image embeddings")
 
     cvkit::infer::ModelSpec spec{};
     spec.model_path = encoder_path.string();
-    spec.backend = cvkit::infer::Backend::onnxruntime;
-    spec.task = cvkit::infer::TaskKind::promptable_segmentation;
-    spec.family = "efficient_sam_encoder";
+    spec.backend    = cvkit::infer::Backend::onnxruntime;
+    spec.task       = cvkit::infer::TaskKind::promptable_segmentation;
+    spec.family     = "efficient_sam_encoder";
 
     cvkit::infer::Model model;
     if (!model.load(spec))
@@ -1021,17 +1021,17 @@ TEST_CASE("promptable segmentation encoder-only returns image embeddings")
     REQUIRE_FALSE(image.empty());
 
     cvkit::core::Frame frame{};
-    frame.desc.width = image.cols;
-    frame.desc.height = image.rows;
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
     frame.desc.channels = image.channels();
-    frame.desc.format = cvkit::core::PixelFormat::bgr8;
-    frame.source = image_path.string();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
     frame.data.assign(image.data, image.data + image.total() * image.elemSize());
 
     cvkit::infer::TaskInput input{};
     input.add("image", frame);
 
-    const auto output = model.run_sync(input);
+    const auto  output     = model.run_sync(input);
     const auto* embeddings = output.find<cvkit::infer::TensorValue>("image_embeddings");
     REQUIRE(embeddings != nullptr);
     CHECK(embeddings->shape == std::vector<std::int64_t>{1, 256, 64, 64});
@@ -1264,10 +1264,10 @@ TEST_CASE("promptable segmentation combined accepts cuda image input and returns
 
 TEST_CASE("promptable segmentation decoder-only consumes embeddings and returns mask")
 {
-    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto source_root  = std::filesystem::path(__FILE__).parent_path().parent_path();
     const auto encoder_path = source_root / "assets" / "models" / "efficient_sam_vitt_encoder.sim.onnx";
     const auto decoder_path = source_root / "assets" / "models" / "efficient_sam_vitt_decoder.sim.onnx";
-    const auto image_path = source_root / "assets" / "images" / "test_001.jpg";
+    const auto image_path   = source_root / "assets" / "images" / "test_001.jpg";
 
     if (!std::filesystem::exists(encoder_path) || !std::filesystem::exists(decoder_path))
     {
@@ -1279,18 +1279,18 @@ TEST_CASE("promptable segmentation decoder-only consumes embeddings and returns 
     REQUIRE_FALSE(image.empty());
 
     cvkit::core::Frame frame{};
-    frame.desc.width = image.cols;
-    frame.desc.height = image.rows;
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
     frame.desc.channels = image.channels();
-    frame.desc.format = cvkit::core::PixelFormat::bgr8;
-    frame.source = image_path.string();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
     frame.data.assign(image.data, image.data + image.total() * image.elemSize());
 
     cvkit::infer::ModelSpec encoder_spec{};
     encoder_spec.model_path = encoder_path.string();
-    encoder_spec.backend = cvkit::infer::Backend::onnxruntime;
-    encoder_spec.task = cvkit::infer::TaskKind::promptable_segmentation;
-    encoder_spec.family = "efficient_sam_encoder";
+    encoder_spec.backend    = cvkit::infer::Backend::onnxruntime;
+    encoder_spec.task       = cvkit::infer::TaskKind::promptable_segmentation;
+    encoder_spec.family     = "efficient_sam_encoder";
 
     cvkit::infer::Model encoder;
     if (!encoder.load(encoder_spec))
@@ -1300,15 +1300,15 @@ TEST_CASE("promptable segmentation decoder-only consumes embeddings and returns 
 
     cvkit::infer::TaskInput encoder_input{};
     encoder_input.add("image", frame);
-    const auto encoder_output = encoder.run_sync(encoder_input);
-    const auto* embeddings = encoder_output.find<cvkit::infer::TensorValue>("image_embeddings");
+    const auto  encoder_output = encoder.run_sync(encoder_input);
+    const auto* embeddings     = encoder_output.find<cvkit::infer::TensorValue>("image_embeddings");
     REQUIRE(embeddings != nullptr);
 
     cvkit::infer::ModelSpec decoder_spec{};
     decoder_spec.model_path = decoder_path.string();
-    decoder_spec.backend = cvkit::infer::Backend::onnxruntime;
-    decoder_spec.task = cvkit::infer::TaskKind::promptable_segmentation;
-    decoder_spec.family = "efficient_sam_decoder";
+    decoder_spec.backend    = cvkit::infer::Backend::onnxruntime;
+    decoder_spec.task       = cvkit::infer::TaskKind::promptable_segmentation;
+    decoder_spec.family     = "efficient_sam_decoder";
     decoder_spec.device     = cvkit::infer::DeviceRef{cvkit::infer::DeviceKind::cuda, 0};
 
     cvkit::infer::Model decoder;
@@ -1323,11 +1323,11 @@ TEST_CASE("promptable segmentation decoder-only consumes embeddings and returns 
     decoder_input.add("points", std::vector<cvkit::core::Point2f>{{image.cols * 0.5F, image.rows * 0.5F}});
     decoder_input.add("point_labels", std::vector<float>{1.0F});
 
-    const auto decoder_output = decoder.run_sync(decoder_input);
-    const auto* mask = decoder_output.find<cvkit::infer::MaskValue>("mask");
-    const auto* low_res_masks = decoder_output.find<cvkit::infer::TensorValue>("low_res_masks");
-    const auto* logits = decoder_output.find<cvkit::infer::TensorValue>("logits");
-    const auto* scores = decoder_output.find<std::vector<float>>("scores");
+    const auto  decoder_output = decoder.run_sync(decoder_input);
+    const auto* mask           = decoder_output.find<cvkit::infer::MaskValue>("mask");
+    const auto* low_res_masks  = decoder_output.find<cvkit::infer::TensorValue>("low_res_masks");
+    const auto* logits         = decoder_output.find<cvkit::infer::TensorValue>("logits");
+    const auto* scores         = decoder_output.find<std::vector<float>>("scores");
     REQUIRE(mask != nullptr);
     REQUIRE(low_res_masks != nullptr);
     REQUIRE(logits != nullptr);

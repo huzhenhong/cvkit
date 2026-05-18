@@ -37,8 +37,8 @@ namespace cvkit::infer::detail
 
         struct PromptablePreprocessResult
         {
-            int width{0};
-            int height{0};
+            int                width{0};
+            int                height{0};
             std::vector<float> point_coords{};
             std::vector<float> point_labels{};
         };
@@ -54,7 +54,7 @@ namespace cvkit::infer::detail
         [[nodiscard]] RawTensor build_encoder_input(const cvkit::core::Frame& frame)
         {
             RawTensor tensor{};
-            tensor.name = "batched_images";
+            tensor.name  = "batched_images";
             tensor.shape = {1, 3, kEncoderImageSize, kEncoderImageSize};
 
             auto source = frame_to_mat_copy(frame);
@@ -90,10 +90,10 @@ namespace cvkit::infer::detail
             {
                 for (int x = 0; x < kEncoderImageSize; ++x)
                 {
-                    const auto pixel = resized.at<cv::Vec3f>(y, x);
-                    const auto offset = static_cast<std::size_t>(y * kEncoderImageSize + x);
-                    tensor.data[offset] = (pixel[0] - kSamMeanR) / kSamStdR;
-                    tensor.data[plane_size + offset] = (pixel[1] - kSamMeanG) / kSamStdG;
+                    const auto pixel                       = resized.at<cv::Vec3f>(y, x);
+                    const auto offset                      = static_cast<std::size_t>(y * kEncoderImageSize + x);
+                    tensor.data[offset]                    = (pixel[0] - kSamMeanR) / kSamStdR;
+                    tensor.data[plane_size + offset]       = (pixel[1] - kSamMeanG) / kSamStdG;
                     tensor.data[(2 * plane_size) + offset] = (pixel[2] - kSamMeanB) / kSamStdB;
                 }
             }
@@ -106,10 +106,11 @@ namespace cvkit::infer::detail
             const cvkit::core::Frame& frame)
         {
             PromptablePreprocessResult result{};
-            result.width = std::max(1, frame.desc.width);
+            result.width  = std::max(1, frame.desc.width);
             result.height = std::max(1, frame.desc.height);
 
-            auto append_point = [&](float x, float y, float label) {
+            auto append_point = [&](float x, float y, float label)
+            {
                 const auto scaled_x =
                     std::clamp(x * static_cast<float>(kEncoderImageSize) / static_cast<float>(result.width), 0.0F, static_cast<float>(kEncoderImageSize - 1));
                 const auto scaled_y =
@@ -131,7 +132,7 @@ namespace cvkit::infer::detail
                 for (std::size_t index = 0; index < points->size(); ++index)
                 {
                     const auto& point = (*points)[index];
-                    const auto label =
+                    const auto  label =
                         (point_labels != nullptr && index < point_labels->size()) ? (*point_labels)[index] : 1.0F;
                     append_point(point.x, point.y, label);
                 }
@@ -151,18 +152,18 @@ namespace cvkit::infer::detail
         [[nodiscard]] RawTensor build_decoder_coords(const PromptablePreprocessResult& prompt)
         {
             RawTensor tensor{};
-            tensor.name = "batched_point_coords";
+            tensor.name  = "batched_point_coords";
             tensor.shape = {1, 1, static_cast<std::int64_t>(prompt.point_labels.size()), 2};
-            tensor.data = prompt.point_coords;
+            tensor.data  = prompt.point_coords;
             return tensor;
         }
 
         [[nodiscard]] RawTensor build_decoder_labels(const PromptablePreprocessResult& prompt)
         {
             RawTensor tensor{};
-            tensor.name = "batched_point_labels";
+            tensor.name  = "batched_point_labels";
             tensor.shape = {1, 1, static_cast<std::int64_t>(prompt.point_labels.size())};
-            tensor.data = prompt.point_labels;
+            tensor.data  = prompt.point_labels;
             return tensor;
         }
 
@@ -185,10 +186,10 @@ namespace cvkit::infer::detail
             cv::threshold(resized, binary, 0.0, 255.0, cv::THRESH_BINARY);
             binary.convertTo(binary, CV_8UC1);
 
-            mask.desc.width = source_width;
-            mask.desc.height = source_height;
+            mask.desc.width    = source_width;
+            mask.desc.height   = source_height;
             mask.desc.channels = 1;
-            mask.desc.format = cvkit::core::PixelFormat::unknown;
+            mask.desc.format   = cvkit::core::PixelFormat::unknown;
             mask.data.assign(binary.data, binary.data + (binary.total() * binary.elemSize()));
             return mask;
         }
@@ -237,7 +238,7 @@ namespace cvkit::infer::detail
 
         [[nodiscard]] bool requires_decoder_model(
             PromptableFamily family,
-            const ModelSpec&  spec)
+            const ModelSpec& spec)
         {
             return family == PromptableFamily::decoder ||
                    (family == PromptableFamily::combined && !spec.aux_model_path.empty());
@@ -252,13 +253,13 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] std::optional<RawTensor> run_encoder_model(
-            const IBackendSession&             backend,
-            const cvkit::infer::ImageValue*    image,
-            const cvkit::core::Frame&          frame,
-            const PipelineContext&             context,
-            Packet&                            packet)
+            const IBackendSession&          backend,
+            const cvkit::infer::ImageValue* image,
+            const cvkit::core::Frame&       frame,
+            const PipelineContext&          context,
+            Packet&                         packet)
         {
-            RawTensor encoder_input{};
+            RawTensor  encoder_input{};
             const bool prefer_device_tensor_input =
                 image != nullptr &&
                 image->memory_device == cvkit::infer::MemoryDevice::cuda &&
@@ -268,7 +269,7 @@ namespace cvkit::infer::detail
             if (prefer_device_tensor_input)
             {
                 std::string preprocess_error{};
-                auto cuda_input = preprocess_promptable_encoder_cuda(
+                auto        cuda_input = preprocess_promptable_encoder_cuda(
                     *image,
                     true,
                     &preprocess_error);
@@ -306,11 +307,11 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] bool resolve_decoder_embedding(
-            PromptableFamily                  family,
-            const TaskInput&                  input,
-            std::optional<RawTensor>          encoder_embedding,
-            RawTensor&                        embedding_input,
-            std::string*                      error_message = nullptr)
+            PromptableFamily         family,
+            const TaskInput&         input,
+            std::optional<RawTensor> encoder_embedding,
+            RawTensor&               embedding_input,
+            std::string*             error_message = nullptr)
         {
             if (requires_external_embeddings(family))
             {
@@ -356,8 +357,8 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] RawTensorMap run_decoder_model(
-            const IBackendSession&        decoder,
-            RawTensor                     embedding_input,
+            const IBackendSession&            decoder,
+            RawTensor                         embedding_input,
             const PromptablePreprocessResult& prompt)
         {
             RawTensorMap decoder_inputs{};
@@ -368,10 +369,10 @@ namespace cvkit::infer::detail
         }
 
         [[nodiscard]] bool select_best_mask(
-            const RawTensor&       mask_tensor,
-            const RawTensor&       iou_tensor,
-            std::vector<float>&    best_mask,
-            FloatListValue&        scores)
+            const RawTensor&    mask_tensor,
+            const RawTensor&    iou_tensor,
+            std::vector<float>& best_mask,
+            FloatListValue&     scores)
         {
             if (mask_tensor.shape.size() != 5 || iou_tensor.data.empty())
             {
@@ -386,7 +387,7 @@ namespace cvkit::infer::detail
             }
 
             std::size_t best_index = 0;
-            float best_score = std::numeric_limits<float>::lowest();
+            float       best_score = std::numeric_limits<float>::lowest();
             for (std::size_t index = 0; index < iou_tensor.data.size(); ++index)
             {
                 if (iou_tensor.data[index] > best_score)
@@ -411,11 +412,11 @@ namespace cvkit::infer::detail
         }
 
         void store_promptable_outputs(
-            Packet&                    packet,
+            Packet&                           packet,
             const PromptablePreprocessResult& prompt,
-            const RawTensor&           mask_tensor,
-            const std::vector<float>&  best_mask,
-            const FloatListValue&      scores)
+            const RawTensor&                  mask_tensor,
+            const std::vector<float>&         best_mask,
+            const FloatListValue&             scores)
         {
             packet.put(
                 "promptable.mask",
@@ -447,7 +448,7 @@ namespace cvkit::infer::detail
             }
 
             std::optional<cvkit::core::Frame> prompt_frame{};
-            const auto* image = input.find<cvkit::infer::ImageValue>("image");
+            const auto*                       image = input.find<cvkit::infer::ImageValue>("image");
             if (image != nullptr)
             {
                 std::string image_error{};
@@ -486,7 +487,7 @@ namespace cvkit::infer::detail
                 }
             }
 
-            RawTensor embedding_input{};
+            RawTensor   embedding_input{};
             std::string embedding_error{};
             if (!resolve_decoder_embedding(
                     family,
@@ -521,10 +522,10 @@ namespace cvkit::infer::detail
                 return false;
             }
 
-            const auto* mask_tensor = &decoder_outputs[0];
-            const auto* iou_tensor = &decoder_outputs[1];
+            const auto*        mask_tensor = &decoder_outputs[0];
+            const auto*        iou_tensor  = &decoder_outputs[1];
             std::vector<float> best_mask{};
-            FloatListValue scores{};
+            FloatListValue     scores{};
             if (!select_best_mask(*mask_tensor, *iou_tensor, best_mask, scores))
             {
                 return false;

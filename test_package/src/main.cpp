@@ -16,13 +16,13 @@ int main()
         return 1;
     }
 
-    auto resized = cvkit::image::resize(frame, 320, 320);
+    auto                    resized = cvkit::image::resize(frame, 320, 320);
 
     cvkit::infer::ModelSpec spec{};
     spec.model_path = "demo.onnx";
-    spec.backend = cvkit::infer::Backend::none;
-    spec.task = cvkit::infer::TaskKind::detection;
-    spec.family = "yolo11";
+    spec.backend    = cvkit::infer::Backend::none;
+    spec.task       = cvkit::infer::TaskKind::detection;
+    spec.family     = "yolo11";
 
     cvkit::infer::Model model;
     if (!model.load(spec))

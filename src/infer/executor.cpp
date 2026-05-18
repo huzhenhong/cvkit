@@ -48,7 +48,8 @@ namespace cvkit::infer::detail
                 workers_.reserve(thread_count);
                 for (std::size_t index = 0; index < thread_count; ++index)
                 {
-                    workers_.emplace_back([this]() { worker_loop(); });
+                    workers_.emplace_back([this]()
+                                          { worker_loop(); });
                 }
             }
 
@@ -83,7 +84,8 @@ namespace cvkit::infer::detail
                         return TaskFuture{std::move(ready)};
                     }
 
-                    queue_.emplace_back([packaged]() { (*packaged)(); });
+                    queue_.emplace_back([packaged]()
+                                        { (*packaged)(); });
                 }
                 condition_.notify_one();
                 return TaskFuture{std::move(future)};
@@ -97,7 +99,8 @@ namespace cvkit::infer::detail
                     std::function<void()> task;
                     {
                         std::unique_lock<std::mutex> lock(mutex_);
-                        condition_.wait(lock, [this]() { return stopping_ || !queue_.empty(); });
+                        condition_.wait(lock, [this]()
+                                        { return stopping_ || !queue_.empty(); });
                         if (stopping_ && queue_.empty())
                         {
                             return;
@@ -111,11 +114,11 @@ namespace cvkit::infer::detail
                 }
             }
 
-            std::mutex                      mutex_{};
-            std::condition_variable         condition_{};
+            std::mutex                        mutex_{};
+            std::condition_variable           condition_{};
             std::deque<std::function<void()>> queue_{};
-            std::vector<std::thread>        workers_{};
-            bool                            stopping_{false};
+            std::vector<std::thread>          workers_{};
+            bool                              stopping_{false};
         };
 
     }  // namespace

@@ -36,7 +36,7 @@ namespace cvkit::infer::detail
             return future_.get();
         }
 
-        template <typename Rep, typename Period>
+        template<typename Rep, typename Period>
         [[nodiscard]] std::future_status wait_for(const std::chrono::duration<Rep, Period>& timeout) const
         {
             return future_.wait_for(timeout);
@@ -59,34 +59,34 @@ namespace cvkit::infer::detail
       public:
         virtual ~INode() = default;
 
-        [[nodiscard]] virtual std::string_view       name() const                  = 0;
-        [[nodiscard]] virtual std::vector<std::string> consumes() const
+        virtual std::string_view         name() const = 0;
+        virtual std::vector<std::string> consumes() const
         {
             return {};
         }
-        [[nodiscard]] virtual std::vector<std::string> produces() const
+        virtual std::vector<std::string> produces() const
         {
             return {};
         }
-        [[nodiscard]] virtual bool supports_async() const
+        virtual bool supports_async() const
         {
             return false;
         }
-        [[nodiscard]] virtual std::string trace_message(const Packet& packet) const
+        virtual std::string trace_message(const Packet& packet) const
         {
             static_cast<void>(packet);
             return {};
         }
-        [[nodiscard]] virtual PacketFuture submit(Packet packet) const
+        virtual PacketFuture submit(Packet packet) const
         {
             return make_ready_packet_future(process(std::move(packet)));
         }
-        [[nodiscard]] virtual Packet                 process(Packet packet) const   = 0;
+        virtual Packet process(Packet packet) const = 0;
     };
 
     struct NodeMetadata
     {
-        std::string name{};
+        std::string              name{};
         std::vector<std::string> depends_on{};
         std::vector<std::string> consumes{};
         std::vector<std::string> produces{};
@@ -101,27 +101,27 @@ namespace cvkit::infer::detail
     class BK_INFER_EXPORT TaskGraph
     {
       public:
-        void                     add_node(std::shared_ptr<INode> node);
-        void                     add_node(std::shared_ptr<INode> node, std::vector<std::string> depends_on);
-        [[nodiscard]] std::size_t node_count() const;
-        [[nodiscard]] std::vector<NodeMetadata> metadata() const;
-        [[nodiscard]] GraphBoundary boundary() const;
-        [[nodiscard]] Packet      run_sync(Packet packet) const;
+        void                       add_node(std::shared_ptr<INode> node);
+        void                       add_node(std::shared_ptr<INode> node, std::vector<std::string> depends_on);
+        std::size_t                node_count() const;
+        std::vector<NodeMetadata>  metadata() const;
+        GraphBoundary              boundary() const;
+        [[nodiscard]] Packet       run_sync(Packet packet) const;
         [[nodiscard]] PacketFuture submit_packet(Packet packet) const;
 
       private:
         struct NodeEntry
         {
-            std::shared_ptr<INode> node{};
+            std::shared_ptr<INode>   node{};
             std::vector<std::string> depends_on{};
         };
 
-        [[nodiscard]] std::vector<std::size_t> execution_order() const;
+        std::vector<std::size_t> execution_order() const;
 
-        std::vector<NodeEntry> nodes_{};
+        std::vector<NodeEntry>   nodes_{};
     };
 
-    [[nodiscard]] TaskGraph create_pipeline_graph(
+    TaskGraph create_pipeline_graph(
         std::shared_ptr<IBackendSession> backend,
         std::shared_ptr<ITaskPipeline>   pipeline,
         PipelineContext                  context);

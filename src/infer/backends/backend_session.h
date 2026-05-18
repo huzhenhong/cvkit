@@ -12,7 +12,7 @@
 namespace cvkit::infer::detail
 {
 
-    using RawTensor = cvkit::infer::TensorValue;
+    using RawTensor    = cvkit::infer::TensorValue;
     using RawTensorMap = cvkit::infer::TensorMap;
 
     class BackendFuture
@@ -34,7 +34,7 @@ namespace cvkit::infer::detail
             return future_.get();
         }
 
-        template <typename Rep, typename Period>
+        template<typename Rep, typename Period>
         [[nodiscard]] std::future_status wait_for(const std::chrono::duration<Rep, Period>& timeout) const
         {
             return future_.wait_for(timeout);
@@ -47,16 +47,14 @@ namespace cvkit::infer::detail
     [[nodiscard]] inline BackendFuture make_ready_backend_future(RawTensorMap outputs)
     {
         std::promise<RawTensorMap> promise;
-        auto future = promise.get_future().share();
+        auto                       future = promise.get_future().share();
         promise.set_value(std::move(outputs));
         return BackendFuture{std::move(future)};
     }
 
     [[nodiscard]] inline bool is_supported_backend_input_tensor(const RawTensor& tensor)
     {
-        return tensor.data_type == TensorDataType::float32
-               && tensor.memory_device == MemoryDevice::host
-               && tensor.has_valid_host_layout();
+        return tensor.data_type == TensorDataType::float32 && tensor.memory_device == MemoryDevice::host && tensor.has_valid_host_layout();
     }
 
     [[nodiscard]] inline bool is_supported_backend_output_tensor_type(TensorDataType data_type)
@@ -69,22 +67,22 @@ namespace cvkit::infer::detail
       public:
         virtual ~IBackendSession() = default;
 
-        virtual bool                            load(const ModelSpec& spec)              = 0;
-        [[nodiscard]] virtual bool              ready() const                            = 0;
-        [[nodiscard]] virtual Backend           backend() const                          = 0;
-        [[nodiscard]] virtual const TensorInfo* input_info(std::size_t index = 0) const  = 0;
-        [[nodiscard]] virtual const TensorInfo* output_info(std::size_t index = 0) const = 0;
-        [[nodiscard]] virtual RawTensorMap      run(const RawTensorMap& inputs) const    = 0;
-        [[nodiscard]] virtual bool              supports_async() const
+        virtual bool              load(const ModelSpec& spec)              = 0;
+        virtual bool              ready() const                            = 0;
+        virtual Backend           backend() const                          = 0;
+        virtual const TensorInfo* input_info(std::size_t index = 0) const  = 0;
+        virtual const TensorInfo* output_info(std::size_t index = 0) const = 0;
+        virtual RawTensorMap      run(const RawTensorMap& inputs) const    = 0;
+        virtual bool              supports_async() const
         {
             return false;
         }
-        [[nodiscard]] virtual BackendFuture     run_async(const RawTensorMap& inputs) const
+        virtual BackendFuture run_async(const RawTensorMap& inputs) const
         {
             return make_ready_backend_future(run(inputs));
         }
     };
 
-    [[nodiscard]] std::unique_ptr<IBackendSession> create_backend_session(Backend backend);
+    std::unique_ptr<IBackendSession> create_backend_session(Backend backend);
 
 }  // namespace cvkit::infer::detail

@@ -16,18 +16,18 @@ namespace cvkit::infer::detail
     namespace
     {
 
-        constexpr int   kEncoderImageSize = 1024;
-        constexpr float kSamMeanR         = 123.675F;
-        constexpr float kSamMeanG         = 116.28F;
-        constexpr float kSamMeanB         = 103.53F;
-        constexpr float kSamStdR          = 58.395F;
-        constexpr float kSamStdG          = 57.12F;
-        constexpr float kSamStdB          = 57.375F;
+        constexpr int           kEncoderImageSize = 1024;
+        constexpr float         kSamMeanR         = 123.675F;
+        constexpr float         kSamMeanG         = 116.28F;
+        constexpr float         kSamMeanB         = 103.53F;
+        constexpr float         kSamStdR          = 58.395F;
+        constexpr float         kSamStdG          = 57.12F;
+        constexpr float         kSamStdB          = 57.375F;
 
         [[nodiscard]] RawTensor build_encoder_input_from_host_frame(const cvkit::core::Frame& frame)
         {
             RawTensor tensor{};
-            tensor.name = "batched_images";
+            tensor.name  = "batched_images";
             tensor.shape = {1, 3, kEncoderImageSize, kEncoderImageSize};
 
             auto source = frame_to_mat_copy(frame);
@@ -63,10 +63,10 @@ namespace cvkit::infer::detail
             {
                 for (int x = 0; x < kEncoderImageSize; ++x)
                 {
-                    const auto pixel = resized.at<cv::Vec3f>(y, x);
-                    const auto offset = static_cast<std::size_t>(y * kEncoderImageSize + x);
-                    tensor.data[offset] = (pixel[0] - kSamMeanR) / kSamStdR;
-                    tensor.data[plane_size + offset] = (pixel[1] - kSamMeanG) / kSamStdG;
+                    const auto pixel                       = resized.at<cv::Vec3f>(y, x);
+                    const auto offset                      = static_cast<std::size_t>(y * kEncoderImageSize + x);
+                    tensor.data[offset]                    = (pixel[0] - kSamMeanR) / kSamStdR;
+                    tensor.data[plane_size + offset]       = (pixel[1] - kSamMeanG) / kSamStdG;
                     tensor.data[(2 * plane_size) + offset] = (pixel[2] - kSamMeanB) / kSamStdB;
                 }
             }

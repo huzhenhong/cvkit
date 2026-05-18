@@ -22,9 +22,9 @@ namespace ieaa
         class IViBe
         {
           public:
-            IViBe(){};
+            IViBe() {};
 
-            virtual ~IViBe(){};
+            virtual ~IViBe() {};
 
             virtual void           UpdateParam(const VibeParam& param) = 0;
 

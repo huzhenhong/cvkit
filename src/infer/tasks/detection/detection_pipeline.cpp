@@ -39,9 +39,7 @@ namespace cvkit::infer::detail
                     continue;
                 }
 
-                if (output.memory_device != MemoryDevice::cuda
-                    || output.data_type != TensorDataType::float32
-                    || !output.has_valid_device_view())
+                if (output.memory_device != MemoryDevice::cuda || output.data_type != TensorDataType::float32 || !output.has_valid_device_view())
                 {
                     return std::nullopt;
                 }
@@ -50,11 +48,11 @@ namespace cvkit::infer::detail
                 return std::nullopt;
 #else
                 RawTensor host_output{};
-                host_output.name = output.name;
-                host_output.shape = output.shape;
-                host_output.data_type = output.data_type;
+                host_output.name          = output.name;
+                host_output.shape         = output.shape;
+                host_output.data_type     = output.data_type;
                 host_output.memory_device = MemoryDevice::host;
-                host_output.storage = StorageKind::owned;
+                host_output.storage       = StorageKind::owned;
                 host_output.data.resize(output.element_count());
 
                 if (cudaMemcpy(
@@ -115,8 +113,8 @@ namespace cvkit::infer::detail
                 }
             }
 
-            auto resolved_shape = backend_shape;
-            const auto* layout_frame = source.frame;
+            auto        resolved_shape = backend_shape;
+            const auto* layout_frame   = source.frame;
             if (layout_frame == nullptr && source.image != nullptr)
             {
                 layout_frame = &source.image->frame;
@@ -151,7 +149,7 @@ namespace cvkit::infer::detail
         Packet&                packet)
     {
         std::string error_message{};
-        auto request = build_detection_request(backend, input, &error_message);
+        auto        request = build_detection_request(backend, input, &error_message);
         if (!request.has_value())
         {
             if (!error_message.empty())
@@ -173,7 +171,7 @@ namespace cvkit::infer::detail
         BackendFuture&         future)
     {
         std::string error_message{};
-        auto request = build_detection_request(backend, input, &error_message);
+        auto        request = build_detection_request(backend, input, &error_message);
         if (!request.has_value())
         {
             if (!error_message.empty())

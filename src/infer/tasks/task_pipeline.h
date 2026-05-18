@@ -24,14 +24,14 @@ namespace cvkit::infer::detail
       public:
         virtual ~ITaskPipeline() = default;
 
-        [[nodiscard]] virtual TaskKind   task() const = 0;
-        [[nodiscard]] virtual TaskSchema schema() const = 0;
-        [[nodiscard]] virtual TaskOutput run_sync(
+        virtual TaskKind   task() const   = 0;
+        virtual TaskSchema schema() const = 0;
+        virtual TaskOutput run_sync(
             const IBackendSession& backend,
             const TaskInput&       input,
             const PipelineContext& context) const = 0;
     };
 
-    [[nodiscard]] std::unique_ptr<ITaskPipeline> create_task_pipeline(TaskKind task, std::string_view family);
+    std::unique_ptr<ITaskPipeline> create_task_pipeline(TaskKind task, std::string_view family);
 
 }  // namespace cvkit::infer::detail

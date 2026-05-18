@@ -49,16 +49,12 @@ namespace cvkit::infer
 
         [[nodiscard]] std::size_t bytes_per_pixel() const
         {
-            return frame.desc.channels > 0
-                       ? static_cast<std::size_t>(frame.desc.channels)
-                       : 0U;
+            return frame.desc.channels > 0 ? static_cast<std::size_t>(frame.desc.channels) : 0U;
         }
 
         [[nodiscard]] std::size_t packed_row_stride_bytes() const
         {
-            return frame.desc.width > 0
-                       ? static_cast<std::size_t>(frame.desc.width) * bytes_per_pixel()
-                       : 0U;
+            return frame.desc.width > 0 ? static_cast<std::size_t>(frame.desc.width) * bytes_per_pixel() : 0U;
         }
 
         [[nodiscard]] std::size_t effective_row_stride_bytes() const
@@ -163,7 +159,7 @@ namespace cvkit::infer
         std::size_t               storage_bytes{0};
         std::shared_ptr<void>     storage_owner{};
 
-        [[nodiscard]] bool is_host_accessible() const
+        [[nodiscard]] bool        is_host_accessible() const
         {
             return memory_device == MemoryDevice::host;
         }
@@ -248,7 +244,7 @@ namespace cvkit::infer
     {
         std::vector<NamedValue> items{};
 
-        template <typename T>
+        template<typename T>
         [[nodiscard]] const T* find(std::string_view name) const
         {
             for (const auto& item : items)
@@ -261,7 +257,7 @@ namespace cvkit::infer
             return nullptr;
         }
 
-        template <typename T>
+        template<typename T>
         void add(std::string name, T&& value)
         {
             items.push_back(NamedValue{std::move(name), Value{std::forward<T>(value)}});
@@ -272,7 +268,7 @@ namespace cvkit::infer
     {
         std::vector<NamedValue> items{};
 
-        template <typename T>
+        template<typename T>
         [[nodiscard]] const T* find(std::string_view name) const
         {
             for (const auto& item : items)
@@ -285,7 +281,7 @@ namespace cvkit::infer
             return nullptr;
         }
 
-        template <typename T>
+        template<typename T>
         void add(std::string name, T&& value)
         {
             items.push_back(NamedValue{std::move(name), Value{std::forward<T>(value)}});
@@ -311,7 +307,7 @@ namespace cvkit::infer
             return future_.get();
         }
 
-        template <typename Rep, typename Period>
+        template<typename Rep, typename Period>
         [[nodiscard]] std::future_status wait_for(const std::chrono::duration<Rep, Period>& timeout) const
         {
             return future_.wait_for(timeout);

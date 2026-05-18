@@ -5,6 +5,7 @@
 Architecture details:
 
 - `docs/ARCHITECTURE.md`
+- `docs/CODING_STYLE.md`
 
 Layering:
 

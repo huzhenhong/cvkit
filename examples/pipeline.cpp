@@ -36,13 +36,13 @@ int main(int argc, char** argv)
     std::string labels_path = default_labels.string();
     std::string image_path{};
     std::string video_path{};
-    std::string output_dir           = default_output_dir.string();
-    std::string reader_backend       = "opencv";
-    std::string writer_backend       = "opencv";
-    std::string infer_backend        = "onnxruntime";
-    std::string cache_policy         = "default";
+    std::string output_dir     = default_output_dir.string();
+    std::string reader_backend = "opencv";
+    std::string writer_backend = "opencv";
+    std::string infer_backend  = "onnxruntime";
+    std::string cache_policy   = "default";
     std::string cache_dir{};
-    std::string gst_codec            = "jpegavi";
+    std::string gst_codec = "jpegavi";
     std::string dump_graph_json_path{};
     bool        async_infer          = false;
     bool        print_graph          = false;
@@ -87,13 +87,13 @@ int main(int argc, char** argv)
     }
 
     cvkit::infer::ModelSpec spec{};
-    spec.model_path  = model_path;
-    spec.labels_path = labels_path;
-    spec.backend     = parse_infer_backend(infer_backend);
-    spec.task        = cvkit::infer::TaskKind::detection;
+    spec.model_path   = model_path;
+    spec.labels_path  = labels_path;
+    spec.backend      = parse_infer_backend(infer_backend);
+    spec.task         = cvkit::infer::TaskKind::detection;
     spec.cache_policy = cvkit::examples::parse_cache_policy(cache_policy);
     spec.cache_dir    = cache_dir;
-    spec.family      = "yolo11";
+    spec.family       = "yolo11";
 
     if (!model.load(spec))
     {

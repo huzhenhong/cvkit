@@ -5,6 +5,7 @@
 架构细节：
 
 - `docs/ARCHITECTURE.md`
+- `docs/CODING_STYLE.md`
 
 分层关系：
 

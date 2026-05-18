@@ -9,9 +9,9 @@ namespace ieaa
         class IPostprocess
         {
           public:
-            explicit IPostprocess(){};
+            explicit IPostprocess() {};
 
-            virtual ~IPostprocess(){};
+            virtual ~IPostprocess() {};
 
             virtual void Process(const unsigned char* src, unsigned char*& dst) = 0;
         };

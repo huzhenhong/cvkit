@@ -21,7 +21,7 @@ namespace cvkit::infer
         TensorDataType            data_type{TensorDataType::float32};
         MemoryDevice              memory_device{MemoryDevice::host};
 
-        [[nodiscard]] bool is_host_accessible() const
+        [[nodiscard]] bool        is_host_accessible() const
         {
             return memory_device == MemoryDevice::host;
         }
@@ -38,11 +38,11 @@ namespace cvkit::infer
       public:
         virtual ~Session() = default;
 
-        [[nodiscard]] virtual bool       ready() const                = 0;
-        [[nodiscard]] virtual Backend    backend() const              = 0;
-        [[nodiscard]] virtual TaskKind   task() const                 = 0;
-        [[nodiscard]] virtual TaskOutput run_sync(const TaskInput& input) const = 0;
-        [[nodiscard]] virtual TaskFuture submit(const TaskInput& input) const   = 0;
+        virtual bool       ready() const                          = 0;
+        virtual Backend    backend() const                        = 0;
+        virtual TaskKind   task() const                           = 0;
+        virtual TaskOutput run_sync(const TaskInput& input) const = 0;
+        virtual TaskFuture submit(const TaskInput& input) const   = 0;
     };
 
 }  // namespace cvkit::infer

@@ -5,8 +5,8 @@
 static void bm_resize(benchmark::State& state)
 {
     cvkit::core::Frame frame{};
-    frame.desc.width = 1920;
-    frame.desc.height = 1080;
+    frame.desc.width    = 1920;
+    frame.desc.height   = 1080;
     frame.desc.channels = 3;
     frame.data.assign(static_cast<std::size_t>(frame.desc.width * frame.desc.height * frame.desc.channels), 0U);
 

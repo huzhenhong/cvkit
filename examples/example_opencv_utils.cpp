@@ -24,7 +24,7 @@ namespace cvkit::examples
     cvkit::infer::ImageValue mat_to_image_value(const cv::Mat& image, std::string source)
     {
         cvkit::infer::ImageValue value{};
-        value.frame = mat_to_frame(image, std::move(source));
+        value.frame            = mat_to_frame(image, std::move(source));
         value.row_stride_bytes = image.empty() ? 0U : image.step[0];
         return value;
     }

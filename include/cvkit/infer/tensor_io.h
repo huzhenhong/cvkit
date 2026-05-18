@@ -9,7 +9,7 @@ namespace cvkit::infer
 {
 
     [[nodiscard]] BK_INFER_EXPORT bool save_tensor_file(
-        const TensorValue&          tensor,
+        const TensorValue&           tensor,
         const std::filesystem::path& path);
 
     [[nodiscard]] BK_INFER_EXPORT bool load_tensor_file(

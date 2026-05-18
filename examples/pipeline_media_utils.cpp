@@ -36,8 +36,7 @@ namespace cvkit::examples
 
         [[nodiscard]] std::string gstreamer_filesrc_pipeline(const std::filesystem::path& path)
         {
-            return "filesrc location=\"" + escape_path_for_gstreamer(path)
-                   + "\" ! decodebin ! videoconvert ! appsink sync=false";
+            return "filesrc location=\"" + escape_path_for_gstreamer(path) + "\" ! decodebin ! videoconvert ! appsink sync=false";
         }
 
         [[nodiscard]] std::string gstreamer_writer_pipeline(
@@ -48,20 +47,17 @@ namespace cvkit::examples
 
             if (codec == cvkit::media::GstVideoCodec::x264mp4)
             {
-                return "appsrc ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! mp4mux ! filesink location=\""
-                       + location + "\"";
+                return "appsrc ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
             }
 
             if (codec == cvkit::media::GstVideoCodec::nvh264)
             {
-                return "appsrc ! videoconvert ! nvh264enc ! h264parse ! mp4mux ! filesink location=\""
-                       + location + "\"";
+                return "appsrc ! videoconvert ! nvh264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
             }
 
             if (codec == cvkit::media::GstVideoCodec::nvv4l2h264)
             {
-                return "appsrc ! videoconvert ! nvv4l2h264enc ! h264parse ! mp4mux ! filesink location=\""
-                       + location + "\"";
+                return "appsrc ! videoconvert ! nvv4l2h264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
             }
 
             return "appsrc ! videoconvert ! jpegenc ! avimux ! filesink location=\"" + location + "\"";
@@ -179,10 +175,8 @@ namespace cvkit::examples
 
         if (writer_backend == cvkit::media::WriterBackend::gstreamer)
         {
-            const bool mp4 = gst_codec == cvkit::media::GstVideoCodec::x264mp4
-                             || gst_codec == cvkit::media::GstVideoCodec::nvh264
-                             || gst_codec == cvkit::media::GstVideoCodec::nvv4l2h264;
-            output_path = output_root / (video_path.stem().string() + (mp4 ? "_det.mp4" : "_det.avi"));
+            const bool mp4 = gst_codec == cvkit::media::GstVideoCodec::x264mp4 || gst_codec == cvkit::media::GstVideoCodec::nvh264 || gst_codec == cvkit::media::GstVideoCodec::nvv4l2h264;
+            output_path    = output_root / (video_path.stem().string() + (mp4 ? "_det.mp4" : "_det.avi"));
             writer.open(
                 gstreamer_writer_pipeline(output_path, gst_codec),
                 cv::CAP_GSTREAMER,

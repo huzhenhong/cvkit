@@ -20,9 +20,9 @@ namespace cvkit::examples
     {
 
         [[nodiscard]] std::vector<cvkit::core::Detection> infer_detections(
-            cvkit::infer::Model& model,
+            cvkit::infer::Model&            model,
             const cvkit::infer::ImageValue& image,
-            bool async_infer)
+            bool                            async_infer)
         {
             if (!async_infer)
             {
@@ -31,7 +31,7 @@ namespace cvkit::examples
 
             cvkit::infer::TaskInput input{};
             input.add("image", image);
-            auto future = model.submit(input);
+            auto       future = model.submit(input);
             const auto output = future.get();
             if (const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
                 detections != nullptr)
@@ -224,7 +224,7 @@ namespace cvkit::examples
         }
 
         std::filesystem::path output_path;
-        cv::VideoWriter writer;
+        cv::VideoWriter       writer;
         if (!open_video_writer(video_path, output_dir, writer_backend, gst_codec, fps, first_frame.size(), writer, output_path))
         {
             return 1;

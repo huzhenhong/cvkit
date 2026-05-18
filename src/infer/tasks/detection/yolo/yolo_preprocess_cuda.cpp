@@ -43,10 +43,10 @@ namespace cvkit::infer::detail
         }
         return std::nullopt;
 #else
-        cvkit::core::Frame host_frame = image.frame;
-        const auto packed_stride = image.packed_row_stride_bytes();
-        const auto height = static_cast<std::size_t>(image.frame.desc.height);
-        const auto bytes = packed_stride * height;
+        cvkit::core::Frame host_frame    = image.frame;
+        const auto         packed_stride = image.packed_row_stride_bytes();
+        const auto         height        = static_cast<std::size_t>(image.frame.desc.height);
+        const auto         bytes         = packed_stride * height;
         if (bytes == 0U)
         {
             if (error_message != nullptr)
@@ -79,7 +79,7 @@ namespace cvkit::infer::detail
     }
 
     std::optional<LetterboxResult> preprocess_yolo_cuda(
-        const cvkit::infer::ImageValue& image,
+        const cvkit::infer::ImageValue&  image,
         const std::vector<std::int64_t>& input_shape,
         bool                             prefer_device_tensor_output,
         std::string*                     error_message)

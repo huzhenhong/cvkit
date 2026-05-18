@@ -16,12 +16,12 @@ namespace cvkit::infer::detail
     class OrtSession final : public IBackendSession
     {
       public:
-        bool                      load(const ModelSpec& spec) override;
-        [[nodiscard]] bool        ready() const override;
-        [[nodiscard]] Backend     backend() const override;
-        [[nodiscard]] const TensorInfo* input_info(std::size_t index = 0) const override;
-        [[nodiscard]] const TensorInfo* output_info(std::size_t index = 0) const override;
-        [[nodiscard]] RawTensorMap run(const RawTensorMap& inputs) const override;
+        bool              load(const ModelSpec& spec) override;
+        bool              ready() const override;
+        Backend           backend() const override;
+        const TensorInfo* input_info(std::size_t index = 0) const override;
+        const TensorInfo* output_info(std::size_t index = 0) const override;
+        RawTensorMap      run(const RawTensorMap& inputs) const override;
 
       private:
 #if defined(CVKIT_WITH_ONNXRUNTIME)

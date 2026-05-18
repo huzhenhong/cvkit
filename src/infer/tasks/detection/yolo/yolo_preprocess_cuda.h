@@ -17,9 +17,9 @@ namespace cvkit::infer::detail
         std::string*                    error_message = nullptr);
 
     [[nodiscard]] std::optional<LetterboxResult> preprocess_yolo_cuda(
-        const cvkit::infer::ImageValue& image,
+        const cvkit::infer::ImageValue&  image,
         const std::vector<std::int64_t>& input_shape,
         bool                             prefer_device_tensor_output = false,
-        std::string*                     error_message = nullptr);
+        std::string*                     error_message               = nullptr);
 
 }  // namespace cvkit::infer::detail

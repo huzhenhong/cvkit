@@ -17,6 +17,10 @@ This document describes the current internal architecture of `cvkit`, with empha
 - task-oriented preprocess/postprocess layering
 - the current host-first, device-aware data contract
 
+Related style guidance:
+
+- `docs/CODING_STYLE.md`
+
 It reflects the repository's current implementation state. Planned directions are called out explicitly and should not be read as already implemented behavior.
 
 ## Goals

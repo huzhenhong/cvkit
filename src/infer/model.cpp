@@ -24,7 +24,7 @@ namespace cvkit::infer
             std::vector<GraphTraceInfo> last_trace{};
         };
 
-        ModelSpec                               spec_{};
+        ModelSpec                                spec_{};
         std::shared_ptr<detail::IBackendSession> backend_{};
         std::shared_ptr<detail::ITaskPipeline>   pipeline_{};
         std::shared_ptr<detail::IExecutor>       executor_{detail::create_default_executor()};
@@ -91,7 +91,7 @@ namespace cvkit::infer
             return TaskFuture{std::move(future)};
         }
 
-        template <typename ImplT>
+        template<typename ImplT>
         [[nodiscard]] detail::PipelineContext make_pipeline_context(const ImplT& impl)
         {
             return detail::PipelineContext{
@@ -101,19 +101,19 @@ namespace cvkit::infer
                 impl.iou_threshold_};
         }
 
-        template <typename ImplT>
+        template<typename ImplT>
         [[nodiscard]] detail::TaskGraph make_pipeline_graph(const ImplT& impl)
         {
             return detail::create_pipeline_graph(impl.backend_, impl.pipeline_, make_pipeline_context(impl));
         }
 
-        template <typename ImplT>
+        template<typename ImplT>
         [[nodiscard]] bool has_runtime_state(const ImplT& impl)
         {
             return impl.loaded_ && impl.backend_ != nullptr && impl.pipeline_ != nullptr;
         }
 
-        template <typename SessionT>
+        template<typename SessionT>
         void append_session_tensors(std::vector<TensorInfo>& destination, const SessionT& session, bool inputs)
         {
             for (std::size_t index = 0;; ++index)
@@ -139,8 +139,8 @@ namespace cvkit::infer
                     metadata.produces});
             }
 
-            const auto boundary = graph.boundary();
-            info.boundary.inputs = boundary.inputs;
+            const auto boundary   = graph.boundary();
+            info.boundary.inputs  = boundary.inputs;
             info.boundary.outputs = boundary.outputs;
             return info;
         }
@@ -164,14 +164,14 @@ namespace cvkit::infer
             return result;
         }
 
-        template <typename TraceStateT>
+        template<typename TraceStateT>
         void store_last_trace(const std::shared_ptr<TraceStateT>& trace_state, const detail::Packet& packet)
         {
             std::lock_guard<std::mutex> lock(trace_state->mutex);
             trace_state->last_trace = convert_graph_trace(packet.trace);
         }
 
-        template <typename TraceStateT>
+        template<typename TraceStateT>
         void clear_last_trace(const std::shared_ptr<TraceStateT>& trace_state)
         {
             std::lock_guard<std::mutex> lock(trace_state->mutex);
@@ -347,10 +347,10 @@ namespace cvkit::infer
             return {};
         }
 
-        auto graph = make_pipeline_graph(*impl_);
+        auto           graph = make_pipeline_graph(*impl_);
         detail::Packet packet{};
         packet.input = input;
-        auto result = graph.run_sync(std::move(packet));
+        auto result  = graph.run_sync(std::move(packet));
         store_last_trace(impl_->trace_state_, result);
         return std::move(result.output);
     }
@@ -362,20 +362,20 @@ namespace cvkit::infer
             return make_ready_future({});
         }
 
-        auto backend = impl_->backend_;
-        auto pipeline = impl_->pipeline_;
-        auto copied_input = input;
-        auto context = make_pipeline_context(*impl_);
-        auto trace_state = impl_->trace_state_;
-        auto graph = detail::create_pipeline_graph(std::move(backend), std::move(pipeline), std::move(context));
+        auto           backend      = impl_->backend_;
+        auto           pipeline     = impl_->pipeline_;
+        auto           copied_input = input;
+        auto           context      = make_pipeline_context(*impl_);
+        auto           trace_state  = impl_->trace_state_;
+        auto           graph        = detail::create_pipeline_graph(std::move(backend), std::move(pipeline), std::move(context));
         detail::Packet packet{};
         packet.input = std::move(copied_input);
         clear_last_trace(trace_state);
-        return impl_->executor_->submit([graph = std::move(graph), packet = std::move(packet), trace_state = std::move(trace_state)]() mutable {
+        return impl_->executor_->submit([graph = std::move(graph), packet = std::move(packet), trace_state = std::move(trace_state)]() mutable
+                                        {
             auto result = graph.submit_packet(std::move(packet)).get();
             store_last_trace(trace_state, result);
-            return std::move(result.output);
-        });
+            return std::move(result.output); });
     }
 
     std::vector<cvkit::core::Detection> Model::run_detection(const cvkit::core::Frame& frame) const

@@ -30,11 +30,11 @@ namespace cvkit::examples::promptable
     [[nodiscard]] cv::Mat first_low_res_mask_to_mat(const cvkit::infer::TensorValue& tensor);
     [[nodiscard]] cv::Mat logits_to_mat(const cvkit::infer::TensorValue& tensor);
 
-    [[nodiscard]] bool dump_graph_json(
-        const cvkit::infer::Model&        model,
-        bool                              async_infer,
-        Mode                              mode,
-        std::string_view                  embeddings_path,
+    [[nodiscard]] bool    dump_graph_json(
+        const cvkit::infer::Model&   model,
+        bool                         async_infer,
+        Mode                         mode,
+        std::string_view             embeddings_path,
         const std::filesystem::path& path);
 
     void print_graph_info(const cvkit::infer::Model& model);

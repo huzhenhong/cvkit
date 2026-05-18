@@ -71,19 +71,19 @@ namespace cvkit::infer::detail
             Packet       packet,
             std::size_t  sequence)
         {
-            const auto before_out = packet.output.items.size();
+            const auto before_out     = packet.output.items.size();
             const auto before_scratch = packet.scratch.size();
             ZoneScoped;
             ZoneName(node.name().data(), static_cast<int>(node.name().size()));
-            const auto started = std::chrono::steady_clock::now();
-            packet = node.process(std::move(packet));
+            const auto started  = std::chrono::steady_clock::now();
+            packet              = node.process(std::move(packet));
             const auto finished = std::chrono::steady_clock::now();
             const auto duration_us =
                 static_cast<std::uint64_t>(
                     std::chrono::duration_cast<std::chrono::microseconds>(finished - started).count());
             const auto message = node.trace_message(packet);
 
-            auto trace = NodeTrace{
+            auto       trace = NodeTrace{
                 std::string{node.name()},
                 sequence,
                 packet.input.items.size(),
@@ -102,19 +102,19 @@ namespace cvkit::infer::detail
             Packet       packet,
             std::size_t  sequence)
         {
-            const auto before_out = packet.output.items.size();
+            const auto before_out     = packet.output.items.size();
             const auto before_scratch = packet.scratch.size();
             ZoneScoped;
             ZoneName(node.name().data(), static_cast<int>(node.name().size()));
-            const auto started = std::chrono::steady_clock::now();
-            packet = node.submit(std::move(packet)).get();
+            const auto started  = std::chrono::steady_clock::now();
+            packet              = node.submit(std::move(packet)).get();
             const auto finished = std::chrono::steady_clock::now();
             const auto duration_us =
                 static_cast<std::uint64_t>(
                     std::chrono::duration_cast<std::chrono::microseconds>(finished - started).count());
             const auto message = node.trace_message(packet);
 
-            auto trace = NodeTrace{
+            auto       trace = NodeTrace{
                 std::string{node.name()},
                 sequence,
                 packet.input.items.size(),
@@ -503,8 +503,8 @@ namespace cvkit::infer::detail
             name_to_index.emplace(std::string{nodes_[index].node->name()}, index);
         }
 
-        std::vector<std::vector<std::size_t>> edges(nodes_.size());
-        std::vector<std::size_t> indegree(nodes_.size(), 0);
+        std::vector<std::vector<std::size_t>>        edges(nodes_.size());
+        std::vector<std::size_t>                     indegree(nodes_.size(), 0);
         std::unordered_map<std::string, std::size_t> produced_by;
         produced_by.reserve(nodes_.size() * 2);
 
@@ -656,18 +656,18 @@ namespace cvkit::infer::detail
             }
 
             auto previous = std::move(packet_future);
-            auto future = std::async(
-                              std::launch::async,
-                              [node = std::move(node), previous = std::move(previous), sequence = index]() mutable
-                              {
+            auto future   = std::async(
+                                std::launch::async,
+                                [node = std::move(node), previous = std::move(previous), sequence = index]() mutable
+                                {
                                   auto packet = previous.get();
                                   if (node->supports_async())
                                   {
                                       return apply_async_node_with_trace(*node, std::move(packet), sequence);
                                   }
                                   return apply_node_with_trace(*node, std::move(packet), sequence);
-                              })
-                              .share();
+                                })
+                                .share();
             packet_future = PacketFuture{std::move(future)};
         }
 

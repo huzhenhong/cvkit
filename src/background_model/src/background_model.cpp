@@ -49,8 +49,8 @@ namespace ieaa
                     m_pre_processor  = std::make_shared<Prepreocss>(m_background_param.preprocess_param);
                     m_post_processor = std::make_shared<Postprocess>(m_background_param.postprocess_param);
                     m_vibe_sptr      = std::make_shared<ViBeCvParallelFor>(m_background_param.vibe_param,
-                                                                      m_background_param.img_width,
-                                                                      m_background_param.img_height);
+                                                                           m_background_param.img_width,
+                                                                           m_background_param.img_height);
                     break;
                 }
 #ifdef _BUILD_CUDA_

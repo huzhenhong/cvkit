@@ -125,9 +125,9 @@ namespace ieaa
                                       {
                                           for (int s = 0; s < m_param.num_samples; ++s)
                                           {
-                                              const int        neighbourhood_squared = m_param.neighbourhood * m_param.neighbourhood;
-                                              int              row                   = r + m_neighbours_y[rng.uniform(0, neighbourhood_squared)];
-                                              int              col                   = c + m_neighbours_x[rng.uniform(0, neighbourhood_squared)];
+                                              const int neighbourhood_squared = m_param.neighbourhood * m_param.neighbourhood;
+                                              int       row                   = r + m_neighbours_y[rng.uniform(0, neighbourhood_squared)];
+                                              int       col                   = c + m_neighbours_x[rng.uniform(0, neighbourhood_squared)];
 
                                               if (row < 0)
                                               {

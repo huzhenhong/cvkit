@@ -18,32 +18,32 @@ int main(int argc, char** argv)
 {
     namespace promptable = cvkit::examples::promptable;
 
-    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
-    const auto default_encoder = source_root / "assets" / "models" / "efficient_sam_vitt_encoder.sim.onnx";
-    const auto default_decoder = source_root / "assets" / "models" / "efficient_sam_vitt_decoder.sim.onnx";
-    const auto default_output_dir = source_root / "assets" / "output";
+    const auto  source_root        = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto  default_encoder    = source_root / "assets" / "models" / "efficient_sam_vitt_encoder.sim.onnx";
+    const auto  default_decoder    = source_root / "assets" / "models" / "efficient_sam_vitt_decoder.sim.onnx";
+    const auto  default_output_dir = source_root / "assets" / "output";
 
-    std::string encoder_path = default_encoder.string();
-    std::string decoder_path = default_decoder.string();
+    std::string encoder_path    = default_encoder.string();
+    std::string decoder_path    = default_decoder.string();
     std::string mode_name_value = "combined";
     std::string embeddings_path{};
     std::string image_path{};
-    std::string output_dir = default_output_dir.string();
+    std::string output_dir   = default_output_dir.string();
     std::string cache_policy = "default";
     std::string cache_dir{};
     std::string dump_graph_json_path{};
     bool        async_infer = false;
     bool        print_graph = false;
-    float       point_x = -1.0F;
-    float       point_y = -1.0F;
+    float       point_x     = -1.0F;
+    float       point_y     = -1.0F;
     float       point_label = 1.0F;
-    float       box_x = 0.0F;
-    float       box_y = 0.0F;
-    float       box_w = 0.0F;
-    float       box_h = 0.0F;
-    bool        use_box = false;
+    float       box_x       = 0.0F;
+    float       box_y       = 0.0F;
+    float       box_w       = 0.0F;
+    float       box_h       = 0.0F;
+    bool        use_box     = false;
 
-    CLI::App app{"cvkit EfficientSAM promptable segmentation example"};
+    CLI::App    app{"cvkit EfficientSAM promptable segmentation example"};
     app.add_option("--mode", mode_name_value, "Run mode: combined, encoder, decoder");
     app.add_option("--encoder", encoder_path, "Path to EfficientSAM encoder ONNX model");
     app.add_option("--decoder", decoder_path, "Path to EfficientSAM decoder ONNX model");
@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     app.add_flag("--use-box", use_box, "Use the provided box prompt");
     CLI11_PARSE(app, argc, argv);
 
-    const auto mode = promptable::parse_mode(mode_name_value);
+    const auto mode  = promptable::parse_mode(mode_name_value);
     const auto image = cv::imread(image_path, cv::IMREAD_COLOR);
     if (image.empty())
     {
@@ -80,25 +80,25 @@ int main(int argc, char** argv)
     }
 
     cvkit::infer::ModelSpec spec{};
-    spec.backend = cvkit::infer::Backend::onnxruntime;
-    spec.task = cvkit::infer::TaskKind::promptable_segmentation;
+    spec.backend      = cvkit::infer::Backend::onnxruntime;
+    spec.task         = cvkit::infer::TaskKind::promptable_segmentation;
     spec.cache_policy = promptable::parse_cache_policy(cache_policy);
-    spec.cache_dir = cache_dir;
+    spec.cache_dir    = cache_dir;
     switch (mode)
     {
         case promptable::Mode::encoder:
             spec.model_path = encoder_path;
-            spec.family = "efficient_sam_encoder";
+            spec.family     = "efficient_sam_encoder";
             break;
         case promptable::Mode::decoder:
             spec.model_path = decoder_path;
-            spec.family = "efficient_sam_decoder";
+            spec.family     = "efficient_sam_decoder";
             break;
         case promptable::Mode::combined:
         default:
-            spec.model_path = encoder_path;
+            spec.model_path     = encoder_path;
             spec.aux_model_path = decoder_path;
-            spec.family = "efficient_sam";
+            spec.family         = "efficient_sam";
             break;
     }
 
@@ -180,10 +180,10 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    const auto* mask_value = output.find<cvkit::infer::MaskValue>("mask");
+    const auto* mask_value    = output.find<cvkit::infer::MaskValue>("mask");
     const auto* low_res_masks = output.find<cvkit::infer::TensorValue>("low_res_masks");
-    const auto* logits = output.find<cvkit::infer::TensorValue>("logits");
-    const auto* scores = output.find<std::vector<float>>("scores");
+    const auto* logits        = output.find<cvkit::infer::TensorValue>("logits");
+    const auto* scores        = output.find<std::vector<float>>("scores");
     if (mask_value == nullptr)
     {
         std::cerr << "segmentation output did not contain a mask\n";
@@ -204,13 +204,13 @@ int main(int argc, char** argv)
 
     std::error_code ec;
     std::filesystem::create_directories(output_dir, ec);
-    const auto output_root = std::filesystem::path(output_dir);
-    const auto stem = std::filesystem::path(image_path).stem().string();
-    const auto mask_path = output_root / (stem + "_sam_mask.png");
-    const auto overlay_path = output_root / (stem + "_sam_overlay.png");
+    const auto output_root       = std::filesystem::path(output_dir);
+    const auto stem              = std::filesystem::path(image_path).stem().string();
+    const auto mask_path         = output_root / (stem + "_sam_mask.png");
+    const auto overlay_path      = output_root / (stem + "_sam_overlay.png");
     const auto low_res_mask_path = output_root / (stem + "_sam_low_res_mask.png");
-    const auto logits_path = output_root / (stem + "_sam_logits.png");
-    const auto logits_text_path = output_root / (stem + "_sam_logits.txt");
+    const auto logits_path       = output_root / (stem + "_sam_logits.png");
+    const auto logits_text_path  = output_root / (stem + "_sam_logits.txt");
 
     if (!cv::imwrite(mask_path.string(), mask))
     {

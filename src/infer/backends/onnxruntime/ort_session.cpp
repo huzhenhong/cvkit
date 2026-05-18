@@ -47,10 +47,7 @@ namespace cvkit::infer::detail
             const RawTensor& tensor,
             bool             cuda_execution_enabled)
         {
-            return cuda_execution_enabled
-                   && tensor.data_type == TensorDataType::float32
-                   && tensor.memory_device == MemoryDevice::cuda
-                   && tensor.has_valid_device_view();
+            return cuda_execution_enabled && tensor.data_type == TensorDataType::float32 && tensor.memory_device == MemoryDevice::cuda && tensor.has_valid_device_view();
         }
 
     }  // namespace
@@ -66,7 +63,7 @@ namespace cvkit::infer::detail
         input_infos_.clear();
         output_infos_.clear();
         cuda_execution_enabled_ = false;
-        cuda_device_index_ = 0;
+        cuda_device_index_      = 0;
 
         if (spec.model_path.empty() || !std::filesystem::exists(spec.model_path))
         {
@@ -86,7 +83,7 @@ namespace cvkit::infer::detail
                 provider_options.device_id = spec.device.index;
                 session_options.AppendExecutionProvider_CUDA(provider_options);
                 cuda_execution_enabled_ = true;
-                cuda_device_index_ = spec.device.index;
+                cuda_device_index_      = spec.device.index;
             }
 
             session_ = std::make_unique<Ort::Session>(ort_env(), spec.model_path.c_str(), session_options);
@@ -97,7 +94,7 @@ namespace cvkit::infer::detail
 
             for (std::size_t i = 0; i < session_->GetInputCount(); ++i)
             {
-                auto name = session_->GetInputNameAllocated(i, allocator);
+                auto       name        = session_->GetInputNameAllocated(i, allocator);
                 const auto tensor_info = session_->GetInputTypeInfo(i).GetTensorTypeAndShapeInfo();
                 input_names_.emplace_back(name.get());
                 input_infos_.push_back(TensorInfo{
@@ -109,7 +106,7 @@ namespace cvkit::infer::detail
 
             for (std::size_t i = 0; i < session_->GetOutputCount(); ++i)
             {
-                auto name = session_->GetOutputNameAllocated(i, allocator);
+                auto       name        = session_->GetOutputNameAllocated(i, allocator);
                 const auto tensor_info = session_->GetOutputTypeInfo(i).GetTensorTypeAndShapeInfo();
                 output_names_.emplace_back(name.get());
                 output_infos_.push_back(TensorInfo{
@@ -130,7 +127,7 @@ namespace cvkit::infer::detail
             input_infos_.clear();
             output_infos_.clear();
             cuda_execution_enabled_ = false;
-            cuda_device_index_ = 0;
+            cuda_device_index_      = 0;
             return false;
         }
 #else
@@ -186,7 +183,7 @@ namespace cvkit::infer::detail
 
         try
         {
-            std::vector<Ort::Value> ort_inputs;
+            std::vector<Ort::Value>  ort_inputs;
             std::vector<const char*> input_names;
 
             ort_inputs.reserve(inputs.size());
@@ -260,7 +257,7 @@ namespace cvkit::infer::detail
                     continue;
                 }
 
-                const auto info = value.GetTensorTypeAndShapeInfo();
+                const auto info      = value.GetTensorTypeAndShapeInfo();
                 const auto data_type = ort_data_type(info.GetElementType());
                 if (!is_supported_backend_output_tensor_type(data_type))
                 {
@@ -268,12 +265,12 @@ namespace cvkit::infer::detail
                 }
 
                 RawTensor tensor{};
-                tensor.name  = i < output_names_.size() ? output_names_[i] : std::string{};
-                tensor.shape = info.GetShape();
-                tensor.data_type = data_type;
+                tensor.name          = i < output_names_.size() ? output_names_[i] : std::string{};
+                tensor.shape         = info.GetShape();
+                tensor.data_type     = data_type;
                 tensor.memory_device = MemoryDevice::host;
-                const auto* data = value.GetTensorData<float>();
-                const auto  size = info.GetElementCount();
+                const auto* data     = value.GetTensorData<float>();
+                const auto  size     = info.GetElementCount();
                 if (data != nullptr && size > 0)
                 {
                     tensor.data.assign(data, data + size);

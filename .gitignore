@@ -1,12 +1,15 @@
+__pycache__
+CMakeUserPresets.json
 build/
 
 # Local test assets. Keep labels versioned, keep heavyweight models local.
-assets/models/*.onnx
-assets/models/*.engine
-assets/models/*.xml
-assets/models/*.bin
+# assets/models/*.onnx
+# assets/models/*.engine
+# assets/models/*.xml
+# assets/models/*.bin
+assets/models/*
 !assets/models/README.md
-
-__pycache__
-assets/output/
-CMakeUserPresets.json
+assets/images
+assets/labels
+assets/output
+assets/video

@@ -374,7 +374,7 @@ Current intent:
 
 Current limitation:
 
-- there is not yet a bundled classification asset/example path comparable to the YOLO11 and EfficientSAM flows
+- there is now a classification example entrypoint, but there is still no bundled classification model asset comparable to the YOLO11 and EfficientSAM flows
 - repository coverage currently comes from focused unit tests and stub backend sessions
 
 Promptable segmentation is already graph-integrated and supports the same graph-aware async model as detection, but its implementation remains first-stage and task-specific.

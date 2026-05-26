@@ -239,6 +239,36 @@ Supported CLI options:
 - `--iou`
 - `--max-frames`
 
+## Classification Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_classification`
+
+Supported CLI options:
+
+- `--model`
+- `--labels`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+Example:
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_classification \
+  --model /path/to/classification.onnx \
+  --labels /path/to/labels.txt \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
 TensorRT cache behavior:
 
 - default cache root:
@@ -290,6 +320,8 @@ Current public data-contract notes:
   - it returns:
     - `classification`
     - `scores`
+  - example entrypoint is now available:
+    - `build/conan/Release/examples/bin/cvkit_example_classification`
   - there is no bundled classification model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
 - promptable segmentation decoder can now consume CUDA-resident `image_embeddings` by materializing them back to host before the current ONNX Runtime execution path
 - promptable segmentation encoder and combined flows can now also accept CUDA-resident `ImageValue` inputs; current ONNX Runtime execution still materializes them back to host before encoder execution

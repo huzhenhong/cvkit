@@ -239,6 +239,36 @@ ENABLE_GSTREAMER_CUDA=ON BUILD_BENCHMARKS=OFF ./scripts/dev_build.sh
 - `--iou`
 - `--max-frames`
 
+## Classification Example
+
+示例可执行文件：
+
+- `build/conan/Release/examples/bin/cvkit_example_classification`
+
+当前支持的 CLI 参数：
+
+- `--model`
+- `--labels`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+示例：
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_classification \
+  --model /path/to/classification.onnx \
+  --labels /path/to/labels.txt \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
 TensorRT cache 规则：
 
 - 默认 cache 根目录：
@@ -290,6 +320,8 @@ TensorRT cache 规则：
   - 当前输出：
     - `classification`
     - `scores`
+  - 现在已经有 example 入口：
+    - `build/conan/Release/examples/bin/cvkit_example_classification`
   - 仓库里目前还没有内置 classification 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
 - promptable segmentation decoder 现在也可以消费 CUDA-resident 的 `image_embeddings`，并在进入当前 ONNX Runtime 执行路径前 materialize 回 host
 - promptable segmentation 的 encoder 和 combined 路径现在也可以接受 CUDA-resident 的 `ImageValue` 输入；当前 ONNX Runtime 执行仍会先 materialize 回 host 再喂 encoder

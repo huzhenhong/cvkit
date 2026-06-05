@@ -137,8 +137,16 @@ namespace cvkit::infer
         {
             case TaskKind::detection:
                 return "detection";
+            case TaskKind::face_detection:
+                return "face_detection";
             case TaskKind::classification:
                 return "classification";
+            case TaskKind::segmentation:
+                return "segmentation";
+            case TaskKind::pose:
+                return "pose";
+            case TaskKind::facemesh:
+                return "facemesh";
             case TaskKind::promptable_segmentation:
                 return "promptable_segmentation";
             case TaskKind::unknown:

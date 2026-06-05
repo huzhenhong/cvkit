@@ -9,9 +9,10 @@ namespace cvkit::infer::detail
 
     struct Candidate
     {
-        cvkit::core::BBox box{};
-        float             score{0.0F};
-        int               class_id{-1};
+        cvkit::core::BBox                 box{};
+        float                             score{0.0F};
+        int                               class_id{-1};
+        std::vector<cvkit::core::Point2f> keypoints{};
     };
 
     [[nodiscard]] std::vector<cvkit::core::Detection> non_maximum_suppression(

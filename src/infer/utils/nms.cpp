@@ -38,6 +38,7 @@ namespace cvkit::infer::detail
             detection.score    = keep.score;
             detection.class_id = keep.class_id;
             detection.label    = resolve_label(labels, keep.class_id);
+            detection.keypoints = keep.keypoints;
             detections.push_back(std::move(detection));
 
             for (std::size_t j = i + 1; j < candidates.size(); ++j)

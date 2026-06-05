@@ -48,10 +48,11 @@ namespace cvkit::core
 
     struct BK_CORE_EXPORT Detection
     {
-        BBox        box{};
-        float       score{0.0F};
-        int         class_id{-1};
-        std::string label{};
+        BBox                 box{};
+        float                score{0.0F};
+        int                  class_id{-1};
+        std::string          label{};
+        std::vector<Point2f> keypoints{};
     };
 
 }  // namespace cvkit::core

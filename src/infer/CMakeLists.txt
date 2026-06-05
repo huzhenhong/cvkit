@@ -6,6 +6,7 @@ add_library(cvkit_infer
     model.cpp
     session.cpp
     registry.cpp
+    tile_runner.cpp
     backends/onnxruntime/ort_session.cpp
     backends/tensorrt/trt_session.cpp
     tasks/classification/classification_pipeline.cpp
@@ -13,9 +14,14 @@ add_library(cvkit_infer
     tasks/detection/yolo/yolo_preprocess_cpu.cpp
     tasks/detection/yolo/yolo_preprocess_cuda.cpp
     tasks/detection/yolo/yolo_postprocess.cpp
+    tasks/face_detection/face_detection_pipeline.cpp
+    tasks/facemesh/facemesh_pipeline.cpp
+    tasks/pose/pose_pipeline.cpp
+    tasks/segmentation/segmentation_pipeline.cpp
     tasks/promptable_segmentation/promptable_segmentation_pipeline.cpp
     tasks/promptable_segmentation/promptable_preprocess_cuda.cpp
     utils/debug.cpp
+    utils/image_preprocess.cpp
     utils/image_value_utils.cpp
     utils/labels.cpp
     utils/nms.cpp

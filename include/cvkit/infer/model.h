@@ -55,6 +55,15 @@ namespace cvkit::infer
         bool                             tensorrt_prefer_device_outputs{false};
     };
 
+    struct BK_INFER_EXPORT TileOptions
+    {
+        bool enabled{false};
+        int  tile_width{0};
+        int  tile_height{0};
+        int  overlap_x{0};
+        int  overlap_y{0};
+    };
+
     struct BK_INFER_EXPORT GraphNodeInfo
     {
         std::string              name{};
@@ -118,6 +127,8 @@ namespace cvkit::infer
         float                                             confidence_threshold() const;
         void                                              set_iou_threshold(float threshold);
         float                                             iou_threshold() const;
+        void                                              set_tile_options(const TileOptions& options);
+        TileOptions                                       tile_options() const;
         [[nodiscard]] TaskOutput                          run_sync(const TaskInput& input) const;
         [[nodiscard]] TaskFuture                          submit(const TaskInput& input) const;
         [[nodiscard]] std::vector<cvkit::core::Detection> run_detection(const cvkit::core::Frame& frame) const;

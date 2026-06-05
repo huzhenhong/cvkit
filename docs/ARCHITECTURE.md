@@ -93,9 +93,56 @@ Current public responsibilities of `Model`:
 - expose backend/session metadata via `session_info()`
 - run synchronously via `run_sync(...)`
 - run asynchronously via `submit(...)`
+- optionally apply model-level tiled inference via `set_tile_options(...)`
 - expose graph/debug info for tracing and JSON export
 
 `Model` is intentionally an orchestration layer. It should not grow backend-specific logic or task-specific tensor packing.
+
+### Model-Level Tiled Inference
+
+Tiled inference is a `Model`-level execution strategy, not a special case inside `face_detection`.
+
+The implementation lives in:
+
+- `src/infer/tile_runner.h`
+- `src/infer/tile_runner.cpp`
+
+The public switch is:
+
+- `TileOptions`
+- `Model::set_tile_options(...)`
+- `Model::tile_options()`
+
+Current behavior:
+
+- tiling is enabled only when `TileOptions::enabled` is true and both tile dimensions are positive
+- the current source must be a host-accessible, packed `image`
+- the source image is cropped into overlapping host tiles
+- each tile reuses the same loaded task pipeline and backend session
+- tile outputs are merged back into source-image coordinates
+
+Current merge support:
+
+- `detection` and `face_detection`
+  - translate boxes and optional keypoints
+  - run global NMS after all tiles are collected
+- `segmentation`
+  - paste tile masks back to a full-size mask canvas
+- `classification`
+  - average tile scores and rebuild top-1 classification
+- `pose`
+  - translate and append keypoints
+- `facemesh`
+  - translate and append landmarks
+
+Current limitations:
+
+- tiling is host-only today; CUDA/NPU tiled source views are planned, not implemented
+- promptable segmentation is intentionally not tiled yet because prompts, embeddings, and mask merging need task-aware coordinate handling
+- tiled runs currently bypass detailed graph trace aggregation; graph tracing remains strongest for the non-tiled path
+- overlap mask merging is simple paste behavior, not weighted blending
+
+The design goal is to let every task opt into the same tiling mechanism where the output semantics are mergeable, while keeping model-family details in task pipelines.
 
 ## ModelSpec
 
@@ -131,14 +178,12 @@ Usage pattern:
 Current first-stage implemented tasks:
 
 - `detection`
+- `face_detection`
 - `classification`
-- `promptable_segmentation`
-
-Planned but not yet implemented task families:
-
 - `segmentation`
 - `pose`
 - `facemesh`
+- `promptable_segmentation`
 
 The current architecture is intentionally set up so that adding a new task family should primarily involve:
 
@@ -377,6 +422,105 @@ Current limitation:
 - there is now a classification example entrypoint, but there is still no bundled classification model asset comparable to the YOLO11 and EfficientSAM flows
 - repository coverage currently comes from focused unit tests and stub backend sessions
 
+### Face Detection
+
+Face detection is separate from generic object detection and dense facemesh.
+
+This matters for models such as SCRFD, where one result row naturally represents:
+
+- face bounding box
+- face confidence score
+- sparse face landmarks, commonly five points
+
+Current behavior:
+
+- input:
+  - `image`
+- preprocess:
+  - host-side image materialization when needed
+  - default SCRFD family uses resize, RGB conversion, `[0, 1]` normalization, and NCHW `float32` tensor packing
+  - `scrfd_raw_bgr` preserves the production SCRFD preprocessing contract:
+    - direct resize to model input
+    - BGR planar channel order
+    - raw `float32` values in `[0, 255]`
+    - no RGB swap and no mean/std normalization
+- backend output interpretation:
+  - SCRFD 9-output ONNX exports are decoded by stride:
+    - `score_8`, `score_16`, `score_32`
+    - `bbox_8`, `bbox_16`, `bbox_32`
+    - `kps_8`, `kps_16`, `kps_32`
+  - decoded/export-simplified row tensors are still accepted as a fallback
+  - supported fallback bbox forms are `x1, y1, x2, y2` and `cx, cy, w, h`
+  - normalized fallback coordinates are scaled back to image pixels
+- outputs:
+  - `detections`
+  - each `Detection` can carry optional `keypoints`
+
+Current limitation:
+
+- `assets/models/scrfd_10g.pth` is a PyTorch/MMDetection checkpoint and must be exported to ONNX before use
+- `assets/models/scrfd_10g_ac133ba7.onnx` is the current validated SCRFD ONNX asset used by the face detection smoke path
+- repository coverage comes from focused unit tests, stub backend sessions, and the SCRFD ONNX smoke test when the asset/backend are available
+
+### Segmentation
+
+Current segmentation support is intentionally minimal and host-first.
+
+Current behavior:
+
+- input:
+  - `image`
+- preprocess:
+  - host-side image materialization when needed
+  - resize
+  - RGB conversion
+  - `[0, 1]` normalization
+  - NCHW `float32` tensor packing
+- backend output interpretation:
+  - first output tensor is treated as `NCHW` class logits
+  - output mask is built by per-pixel channel argmax
+- outputs:
+  - `mask`
+  - `logits`
+
+Current limitation:
+
+- there is no bundled segmentation model asset yet
+- repository coverage currently comes from focused unit tests and stub backend sessions
+
+### Pose And FaceMesh
+
+Current pose and facemesh support is intentionally minimal and host-first.
+
+Current behavior:
+
+- input:
+  - `image`
+- preprocess:
+  - host-side image materialization when needed
+  - resize
+  - RGB conversion
+  - `[0, 1]` normalization
+  - NCHW `float32` tensor packing
+- backend output interpretation:
+  - first output tensor is treated as packed point coordinates
+  - last dimension `2` means `x, y`
+  - last dimension `3` means `x, y, score`
+  - facemesh also accepts last dimension `4`, interpreted as `x, y, z, score`
+- outputs:
+  - pose returns `keypoints`
+  - facemesh returns `landmarks`
+  - `scores`
+  - `raw`
+
+Current limitation:
+
+- there is no bundled pose model asset yet
+- there is no bundled facemesh model asset yet
+- repository coverage currently comes from focused unit tests and stub backend sessions
+- concrete model-family adapters such as YOLO-pose or HRNet are still future work
+- concrete model-family adapters for facemesh-style models are still future work
+
 Promptable segmentation is already graph-integrated and supports the same graph-aware async model as detection, but its implementation remains first-stage and task-specific.
 
 ## Data Contract
@@ -603,6 +747,9 @@ Current repository state is strongest in:
 
 - YOLO11 detection
 - first-stage classification pipeline structure
+- first-stage segmentation pipeline structure
+- first-stage pose pipeline structure
+- first-stage facemesh pipeline structure
 - EfficientSAM promptable segmentation
 - ONNX Runtime + TensorRT backend coverage
 - graph execution and observability
@@ -623,10 +770,7 @@ Planned near-term directions:
 - continue device-aware data-path work
 - broaden device-side preprocess beyond the current detection-first path
 - continue tightening backend tensor-engine contracts
-- extend task coverage:
-  - segmentation
-  - pose
-  - facemesh
+- add concrete model-family adapters for pose and facemesh once model assets are selected
 
 Planned later directions:
 

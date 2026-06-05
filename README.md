@@ -58,16 +58,15 @@ Current first-stage inference scope:
 
 - implemented tasks:
   - detection
+  - face detection
   - classification
+  - segmentation
+  - pose
+  - facemesh
   - promptable segmentation
 - implemented backends:
   - onnxruntime
   - tensorrt
-- planned but not implemented task families:
-  - segmentation
-  - pose
-  - facemesh
-
 ## Build Options
 
 Core local options:
@@ -269,6 +268,145 @@ build/conan/Release/examples/bin/cvkit_example_classification \
   --print-graph
 ```
 
+## Face Detection Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_face_detection`
+
+Supported CLI options:
+
+- `--model`
+- `--image`
+- `--output-dir`
+- `--infer-backend onnxruntime|tensorrt`
+- `--family scrfd|scrfd_raw_bgr`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+- `--conf`
+- `--iou`
+- `--tile-width`
+- `--tile-height`
+- `--tile-overlap-x`
+- `--tile-overlap-y`
+
+Example:
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_face_detection \
+  --model assets/models/scrfd_10g_ac133ba7.onnx \
+  --image assets/images/face.jpg \
+  --output-dir assets/output \
+  --infer-backend onnxruntime \
+  --family scrfd_raw_bgr \
+  --conf 0.5 \
+  --iou 0.4 \
+  --tile-width 640 \
+  --tile-height 640 \
+  --tile-overlap-x 160 \
+  --tile-overlap-y 160 \
+  --print-graph
+```
+
+`scrfd_raw_bgr` keeps the production SCRFD preprocessing contract: direct resize, BGR planar input, raw `float32` values in `[0, 255]`, and no RGB swap or normalization. The tile flags enable model-level tiled inference and merge detections back into source-image coordinates.
+
+The bundled `assets/models/scrfd_10g.pth` is a PyTorch/MMDetection checkpoint, not an ONNX Runtime or TensorRT loadable model. Export it first from an environment that has SCRFD/MMDetection dependencies:
+
+```bash
+cd /workspace/cvkit
+scripts/export_scrfd_onnx.sh assets/models/scrfd_10g.pth assets/models/scrfd_10g.onnx
+```
+
+## Segmentation Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_segmentation`
+
+Supported CLI options:
+
+- `--model`
+- `--image`
+- `--output-dir`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+Example:
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_segmentation \
+  --model /path/to/segmentation.onnx \
+  --image assets/images/test_001.jpg \
+  --output-dir assets/output \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
+## Pose Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_pose`
+
+Supported CLI options:
+
+- `--model`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+Example:
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_pose \
+  --model /path/to/pose.onnx \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
+## FaceMesh Example
+
+Example binary:
+
+- `build/conan/Release/examples/bin/cvkit_example_facemesh`
+
+Supported CLI options:
+
+- `--model`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+Example:
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_facemesh \
+  --model /path/to/facemesh.onnx \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
 TensorRT cache behavior:
 
 - default cache root:
@@ -323,6 +461,51 @@ Current public data-contract notes:
   - example entrypoint is now available:
     - `build/conan/Release/examples/bin/cvkit_example_classification`
   - there is no bundled classification model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
+- segmentation first-stage status:
+  - current pipeline is host-first and task-oriented
+  - it resizes and normalizes image input on CPU
+  - it treats backend output as `NCHW` class logits
+  - it returns:
+    - `mask`
+    - `logits`
+  - example entrypoint is now available:
+    - `build/conan/Release/examples/bin/cvkit_example_segmentation`
+  - there is no bundled segmentation model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
+- face detection first-stage status:
+  - current pipeline is host-first and task-oriented
+  - it is intended for SCRFD-style outputs that combine bbox, score, and sparse facial keypoints
+  - it supports SCRFD 9-output ONNX exports:
+    - `score_8`, `score_16`, `score_32`
+    - `bbox_8`, `bbox_16`, `bbox_32`
+    - `kps_8`, `kps_16`, `kps_32`
+  - it returns:
+    - `detections`
+  - each `Detection` may now carry `keypoints`, so a face can expose bbox + score + 5 landmarks in one result item
+  - example entrypoint is now available:
+    - `build/conan/Release/examples/bin/cvkit_example_face_detection`
+  - there is no bundled face detection model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
+- pose first-stage status:
+  - current pipeline is host-first and task-oriented
+  - it resizes and normalizes image input on CPU
+  - it interprets the first backend output as packed keypoint coordinates with optional score values
+  - it returns:
+    - `keypoints`
+    - `scores`
+    - `raw`
+  - example entrypoint is now available:
+    - `build/conan/Release/examples/bin/cvkit_example_pose`
+  - there is no bundled pose model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
+- facemesh first-stage status:
+  - current pipeline is host-first and task-oriented
+  - it resizes and normalizes image input on CPU
+  - it interprets the first backend output as packed landmark coordinates with optional score values
+  - it returns:
+    - `landmarks`
+    - `scores`
+    - `raw`
+  - example entrypoint is now available:
+    - `build/conan/Release/examples/bin/cvkit_example_facemesh`
+  - there is no bundled facemesh model asset yet, so repository coverage is currently provided by focused unit tests and stub backends
 - promptable segmentation decoder can now consume CUDA-resident `image_embeddings` by materializing them back to host before the current ONNX Runtime execution path
 - promptable segmentation encoder and combined flows can now also accept CUDA-resident `ImageValue` inputs; current ONNX Runtime execution still materializes them back to host before encoder execution
 - when an ONNX Runtime session is loaded with `ModelSpec.device.kind = cuda`, CUDA-resident promptable decoder embeddings can now flow through a real ORT CUDA tensor input path instead of always being copied back to host first
@@ -553,7 +736,7 @@ Not yet finalized:
 - production-grade video writer abstraction outside the example support layer
 - generalized non-host / non-float32 tensor execution paths
 - production GPU preprocess and broader device-resident data flow
-- more task families beyond detection, classification, and promptable segmentation
+- more task families beyond detection, classification, segmentation, and promptable segmentation
 - stronger external-view / zero-copy ownership model beyond the current metadata-only `storage` contract
 
 ## Planned Next
@@ -565,10 +748,7 @@ Near-term work planned from the current codebase state:
 - move from metadata-only device awareness toward real GPU preprocess support
 - continue tightening the backend tensor-engine contract
   - especially around non-host and non-float32 execution support
-- extend task coverage
-  - segmentation
-  - pose
-  - facemesh
+- add model-family adapters for pose and facemesh once concrete model assets are selected
 
 Important scope note:
 
@@ -596,6 +776,7 @@ Behavior:
   - runs an image pipeline smoke test if the required assets are present
 - `cvkit_package.sh`
   - runs `conan create` for `cvkit`
+  - builds and runs `test_package`, which validates packaged public headers, component targets, the aggregate `cvkit::cvkit` target, task schemas, and `TileOptions` without requiring model assets
   - skips gracefully if required system OpenCV or ONNX Runtime packages are not detected
 - `all.sh`
   - runs both scripts in sequence

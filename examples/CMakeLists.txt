@@ -19,6 +19,30 @@ add_executable(cvkit_example_classification
     classification.cpp
 )
 
+add_executable(cvkit_example_face_detection
+    example_graph_utils.cpp
+    example_opencv_utils.cpp
+    face_detection.cpp
+)
+
+add_executable(cvkit_example_segmentation
+    example_graph_utils.cpp
+    example_opencv_utils.cpp
+    segmentation.cpp
+)
+
+add_executable(cvkit_example_pose
+    example_graph_utils.cpp
+    example_opencv_utils.cpp
+    pose.cpp
+)
+
+add_executable(cvkit_example_facemesh
+    example_graph_utils.cpp
+    example_opencv_utils.cpp
+    facemesh.cpp
+)
+
 target_link_libraries(cvkit_example_pipeline
     PRIVATE
         cvkit::media
@@ -48,9 +72,46 @@ target_link_libraries(cvkit_example_classification
         opencv_imgcodecs
 )
 
+target_link_libraries(cvkit_example_face_detection
+    PRIVATE
+        cvkit::infer
+        basekit::cli11
+        opencv_core
+        opencv_imgproc
+        opencv_imgcodecs
+)
+
+target_link_libraries(cvkit_example_segmentation
+    PRIVATE
+        cvkit::infer
+        basekit::cli11
+        opencv_core
+        opencv_imgcodecs
+)
+
+target_link_libraries(cvkit_example_pose
+    PRIVATE
+        cvkit::infer
+        basekit::cli11
+        opencv_core
+        opencv_imgcodecs
+)
+
+target_link_libraries(cvkit_example_facemesh
+    PRIVATE
+        cvkit::infer
+        basekit::cli11
+        opencv_core
+        opencv_imgcodecs
+)
+
 target_compile_features(cvkit_example_pipeline PRIVATE cxx_std_17)
 target_compile_features(cvkit_example_promptable_segmentation PRIVATE cxx_std_17)
 target_compile_features(cvkit_example_classification PRIVATE cxx_std_17)
+target_compile_features(cvkit_example_face_detection PRIVATE cxx_std_17)
+target_compile_features(cvkit_example_segmentation PRIVATE cxx_std_17)
+target_compile_features(cvkit_example_pose PRIVATE cxx_std_17)
+target_compile_features(cvkit_example_facemesh PRIVATE cxx_std_17)
 
 set_target_properties(cvkit_example_pipeline PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
@@ -61,5 +122,21 @@ set_target_properties(cvkit_example_promptable_segmentation PROPERTIES
 )
 
 set_target_properties(cvkit_example_classification PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+
+set_target_properties(cvkit_example_face_detection PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+
+set_target_properties(cvkit_example_segmentation PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+
+set_target_properties(cvkit_example_pose PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+
+set_target_properties(cvkit_example_facemesh PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
 )

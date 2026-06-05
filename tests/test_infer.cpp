@@ -5,6 +5,10 @@
 #include "../src/infer/graph/graph.h"
 #include "../src/infer/tasks/classification/classification_pipeline.h"
 #include "../src/infer/tasks/detection/yolo/yolo_preprocess.h"
+#include "../src/infer/tasks/face_detection/face_detection_pipeline.h"
+#include "../src/infer/tasks/facemesh/facemesh_pipeline.h"
+#include "../src/infer/tasks/pose/pose_pipeline.h"
+#include "../src/infer/tasks/segmentation/segmentation_pipeline.h"
 #include "cvkit/infer/model.h"
 #include "cvkit/infer/tensor_io.h"
 
@@ -14,6 +18,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <future>
+#include <iterator>
 
 #if defined(CVKIT_WITH_CUDA_RUNTIME)
     #include <cuda_runtime_api.h>
@@ -156,6 +161,353 @@ namespace
         }
     };
 
+    class StubSegmentationBackendSession final : public cvkit::infer::detail::IBackendSession
+    {
+      public:
+        bool load(const cvkit::infer::ModelSpec& spec) override
+        {
+            static_cast<void>(spec);
+            return true;
+        }
+
+        [[nodiscard]] bool ready() const override
+        {
+            return true;
+        }
+
+        [[nodiscard]] cvkit::infer::Backend backend() const override
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* input_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo input{
+                "images",
+                {1, 3, 4, 4},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &input : nullptr;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* output_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo output{
+                "logits",
+                {1, 2, 4, 4},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &output : nullptr;
+        }
+
+        [[nodiscard]] cvkit::infer::detail::RawTensorMap run(
+            const cvkit::infer::detail::RawTensorMap& inputs) const override
+        {
+            REQUIRE(inputs.size() == 1);
+            REQUIRE(inputs.front().shape == std::vector<std::int64_t>{1, 3, 4, 4});
+            REQUIRE(inputs.front().data_type == cvkit::infer::TensorDataType::float32);
+            REQUIRE(inputs.front().memory_device == cvkit::infer::MemoryDevice::host);
+
+            cvkit::infer::detail::RawTensor output{};
+            output.name  = "logits";
+            output.shape = {1, 2, 4, 4};
+            output.data.resize(2U * 4U * 4U, 0.0F);
+
+            const auto plane_size = 4U * 4U;
+            for (std::size_t index = 0; index < plane_size; ++index)
+            {
+                output.data[index]              = 0.1F;
+                output.data[plane_size + index] = index % 2U == 0U ? 0.9F : 0.0F;
+            }
+            return {std::move(output)};
+        }
+    };
+
+    class StubFaceDetectionBackendSession final : public cvkit::infer::detail::IBackendSession
+    {
+      public:
+        bool load(const cvkit::infer::ModelSpec& spec) override
+        {
+            static_cast<void>(spec);
+            return true;
+        }
+
+        [[nodiscard]] bool ready() const override
+        {
+            return true;
+        }
+
+        [[nodiscard]] cvkit::infer::Backend backend() const override
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* input_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo input{
+                "images",
+                {1, 3, 64, 64},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &input : nullptr;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* output_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo output{
+                "faces",
+                {1, 2, 15},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &output : nullptr;
+        }
+
+        [[nodiscard]] cvkit::infer::detail::RawTensorMap run(
+            const cvkit::infer::detail::RawTensorMap& inputs) const override
+        {
+            REQUIRE(inputs.size() == 1);
+            REQUIRE(inputs.front().shape == std::vector<std::int64_t>{1, 3, 64, 64});
+            REQUIRE(inputs.front().data_type == cvkit::infer::TensorDataType::float32);
+            REQUIRE(inputs.front().memory_device == cvkit::infer::MemoryDevice::host);
+
+            cvkit::infer::detail::RawTensor output{};
+            output.name  = "faces";
+            output.shape = {1, 2, 15};
+            output.data  = {
+                10.0F, 12.0F, 30.0F, 36.0F, 0.95F,
+                14.0F, 18.0F, 26.0F, 18.0F, 20.0F, 24.0F, 15.0F, 30.0F, 25.0F, 30.0F,
+                11.0F, 13.0F, 29.0F, 35.0F, 0.50F,
+                14.0F, 18.0F, 26.0F, 18.0F, 20.0F, 24.0F, 15.0F, 30.0F, 25.0F, 30.0F};
+            return {std::move(output)};
+        }
+    };
+
+    class StubScrfdBackendSession final : public cvkit::infer::detail::IBackendSession
+    {
+      public:
+        bool load(const cvkit::infer::ModelSpec& spec) override
+        {
+            static_cast<void>(spec);
+            return true;
+        }
+
+        [[nodiscard]] bool ready() const override
+        {
+            return true;
+        }
+
+        [[nodiscard]] cvkit::infer::Backend backend() const override
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* input_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo input{
+                "input.1",
+                {1, 3, 64, 64},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &input : nullptr;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* output_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo outputs[] = {
+                {"score_8", {1, 128, 1}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"score_16", {1, 32, 1}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"score_32", {1, 8, 1}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"bbox_8", {1, 128, 4}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"bbox_16", {1, 32, 4}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"bbox_32", {1, 8, 4}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"kps_8", {1, 128, 10}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"kps_16", {1, 32, 10}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+                {"kps_32", {1, 8, 10}, cvkit::infer::TensorDataType::float32, cvkit::infer::MemoryDevice::host},
+            };
+            return index < std::size(outputs) ? &outputs[index] : nullptr;
+        }
+
+        [[nodiscard]] cvkit::infer::detail::RawTensorMap run(
+            const cvkit::infer::detail::RawTensorMap& inputs) const override
+        {
+            REQUIRE(inputs.size() == 1);
+            REQUIRE(inputs.front().name == "input.1");
+            REQUIRE(inputs.front().shape == std::vector<std::int64_t>{1, 3, 64, 64});
+            REQUIRE(inputs.front().data_type == cvkit::infer::TensorDataType::float32);
+            REQUIRE(inputs.front().memory_device == cvkit::infer::MemoryDevice::host);
+
+            cvkit::infer::detail::RawTensorMap outputs{};
+            outputs.reserve(9U);
+            const std::int64_t rows[] = {128, 32, 8};
+            for (std::size_t level = 0; level < 3U; ++level)
+            {
+                cvkit::infer::detail::RawTensor score{};
+                score.name  = "score";
+                score.shape = {1, rows[level], 1};
+                score.data.assign(static_cast<std::size_t>(rows[level]), 0.01F);
+                if (level == 0)
+                {
+                    score.data[18] = 0.95F;
+                }
+                outputs.push_back(std::move(score));
+            }
+            for (std::size_t level = 0; level < 3U; ++level)
+            {
+                cvkit::infer::detail::RawTensor bbox{};
+                bbox.name  = "bbox";
+                bbox.shape = {1, rows[level], 4};
+                bbox.data.assign(static_cast<std::size_t>(rows[level] * 4), 0.0F);
+                if (level == 0)
+                {
+                    const auto offset = 18U * 4U;
+                    bbox.data[offset + 0U] = 1.0F;
+                    bbox.data[offset + 1U] = 1.0F;
+                    bbox.data[offset + 2U] = 1.5F;
+                    bbox.data[offset + 3U] = 2.0F;
+                }
+                outputs.push_back(std::move(bbox));
+            }
+            for (std::size_t level = 0; level < 3U; ++level)
+            {
+                cvkit::infer::detail::RawTensor kps{};
+                kps.name  = "kps";
+                kps.shape = {1, rows[level], 10};
+                kps.data.assign(static_cast<std::size_t>(rows[level] * 10), 0.0F);
+                if (level == 0)
+                {
+                    const auto offset = 18U * 10U;
+                    kps.data[offset + 0U] = -0.5F;
+                    kps.data[offset + 1U] = -0.5F;
+                    kps.data[offset + 2U] = 0.5F;
+                    kps.data[offset + 3U] = -0.5F;
+                    kps.data[offset + 4U] = 0.0F;
+                    kps.data[offset + 5U] = 0.0F;
+                    kps.data[offset + 6U] = -0.5F;
+                    kps.data[offset + 7U] = 1.0F;
+                    kps.data[offset + 8U] = 0.5F;
+                    kps.data[offset + 9U] = 1.0F;
+                }
+                outputs.push_back(std::move(kps));
+            }
+            return outputs;
+        }
+    };
+
+    class StubPoseBackendSession final : public cvkit::infer::detail::IBackendSession
+    {
+      public:
+        bool load(const cvkit::infer::ModelSpec& spec) override
+        {
+            static_cast<void>(spec);
+            return true;
+        }
+
+        [[nodiscard]] bool ready() const override
+        {
+            return true;
+        }
+
+        [[nodiscard]] cvkit::infer::Backend backend() const override
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* input_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo input{
+                "images",
+                {1, 3, 8, 8},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &input : nullptr;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* output_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo output{
+                "keypoints",
+                {1, 3, 3},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &output : nullptr;
+        }
+
+        [[nodiscard]] cvkit::infer::detail::RawTensorMap run(
+            const cvkit::infer::detail::RawTensorMap& inputs) const override
+        {
+            REQUIRE(inputs.size() == 1);
+            REQUIRE(inputs.front().shape == std::vector<std::int64_t>{1, 3, 8, 8});
+            REQUIRE(inputs.front().data_type == cvkit::infer::TensorDataType::float32);
+            REQUIRE(inputs.front().memory_device == cvkit::infer::MemoryDevice::host);
+
+            cvkit::infer::detail::RawTensor output{};
+            output.name  = "keypoints";
+            output.shape = {1, 3, 3};
+            output.data  = {
+                1.0F, 2.0F, 0.9F,
+                3.0F, 4.0F, 0.8F,
+                5.0F, 6.0F, 0.7F};
+            return {std::move(output)};
+        }
+    };
+
+    class StubFaceMeshBackendSession final : public cvkit::infer::detail::IBackendSession
+    {
+      public:
+        bool load(const cvkit::infer::ModelSpec& spec) override
+        {
+            static_cast<void>(spec);
+            return true;
+        }
+
+        [[nodiscard]] bool ready() const override
+        {
+            return true;
+        }
+
+        [[nodiscard]] cvkit::infer::Backend backend() const override
+        {
+            return cvkit::infer::Backend::onnxruntime;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* input_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo input{
+                "images",
+                {1, 3, 16, 16},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &input : nullptr;
+        }
+
+        [[nodiscard]] const cvkit::infer::TensorInfo* output_info(std::size_t index = 0) const override
+        {
+            static const cvkit::infer::TensorInfo output{
+                "landmarks",
+                {1, 2, 4},
+                cvkit::infer::TensorDataType::float32,
+                cvkit::infer::MemoryDevice::host};
+            return index == 0 ? &output : nullptr;
+        }
+
+        [[nodiscard]] cvkit::infer::detail::RawTensorMap run(
+            const cvkit::infer::detail::RawTensorMap& inputs) const override
+        {
+            REQUIRE(inputs.size() == 1);
+            REQUIRE(inputs.front().shape == std::vector<std::int64_t>{1, 3, 16, 16});
+            REQUIRE(inputs.front().data_type == cvkit::infer::TensorDataType::float32);
+            REQUIRE(inputs.front().memory_device == cvkit::infer::MemoryDevice::host);
+
+            cvkit::infer::detail::RawTensor output{};
+            output.name  = "landmarks";
+            output.shape = {1, 2, 4};
+            output.data  = {
+                1.0F, 2.0F, 0.0F, 0.95F,
+                3.0F, 4.0F, 0.1F, 0.85F};
+            return {std::move(output)};
+        }
+    };
+
     class AsyncTestNode final : public cvkit::infer::detail::INode
     {
       public:
@@ -276,6 +628,26 @@ TEST_CASE("model exposes configurable yolo thresholds")
 
     CHECK(model.confidence_threshold() == Catch::Approx(0.6F));
     CHECK(model.iou_threshold() == Catch::Approx(0.3F));
+}
+
+TEST_CASE("model exposes configurable tile options")
+{
+    cvkit::infer::Model model;
+    CHECK_FALSE(model.tile_options().enabled);
+
+    cvkit::infer::TileOptions options{};
+    options.enabled     = true;
+    options.tile_width  = 320;
+    options.tile_height = 240;
+    options.overlap_x   = 32;
+    options.overlap_y   = 24;
+    model.set_tile_options(options);
+
+    CHECK(model.tile_options().enabled);
+    CHECK(model.tile_options().tile_width == 320);
+    CHECK(model.tile_options().tile_height == 240);
+    CHECK(model.tile_options().overlap_x == 32);
+    CHECK(model.tile_options().overlap_y == 24);
 }
 
 TEST_CASE("model session_info exposes backend tensor metadata for yolo model")
@@ -482,6 +854,296 @@ TEST_CASE("classification pipeline returns top1 label and scores")
     CHECK(classification->label == "dog");
     CHECK(scores->size() == 3);
     CHECK(scores->at(1) == Catch::Approx(0.85F));
+}
+
+TEST_CASE("segmentation pipeline returns mask and logits")
+{
+    StubSegmentationBackendSession             backend{};
+    cvkit::infer::detail::SegmentationPipeline pipeline{};
+
+    cvkit::infer::detail::PipelineContext context{};
+    context.spec.task   = cvkit::infer::TaskKind::segmentation;
+    context.spec.family = "segmentation";
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 4;
+    frame.desc.height   = 4;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(4 * 4 * 3), 127U);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", cvkit::infer::ImageValue{frame});
+
+    const auto  output = pipeline.run_sync(backend, input, context);
+    const auto* mask   = output.find<cvkit::infer::MaskValue>("mask");
+    const auto* logits = output.find<cvkit::infer::TensorValue>("logits");
+    REQUIRE(mask != nullptr);
+    REQUIRE(logits != nullptr);
+    CHECK(mask->frame.desc.width == 4);
+    CHECK(mask->frame.desc.height == 4);
+    CHECK(mask->frame.desc.channels == 1);
+    REQUIRE(mask->frame.data.size() == 16);
+    CHECK(mask->frame.data[0] == 1);
+    CHECK(mask->frame.data[1] == 0);
+    CHECK(logits->shape == std::vector<std::int64_t>{1, 2, 4, 4});
+}
+
+TEST_CASE("face detection pipeline returns bbox and five landmarks")
+{
+    StubFaceDetectionBackendSession             backend{};
+    cvkit::infer::detail::FaceDetectionPipeline pipeline{};
+
+    cvkit::infer::detail::PipelineContext context{};
+    context.spec.task            = cvkit::infer::TaskKind::face_detection;
+    context.spec.family          = "decoded_rows";
+    context.confidence_threshold = 0.6F;
+    context.iou_threshold        = 0.4F;
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 64;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 64 * 3), 127U);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", cvkit::infer::ImageValue{frame});
+
+    const auto  output     = pipeline.run_sync(backend, input, context);
+    const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(detections != nullptr);
+    REQUIRE(detections->size() == 1);
+    CHECK(detections->front().class_id == 0);
+    CHECK(detections->front().score == Catch::Approx(0.95F));
+    CHECK(detections->front().box.x == Catch::Approx(10.0F));
+    CHECK(detections->front().box.y == Catch::Approx(12.0F));
+    CHECK(detections->front().box.width == Catch::Approx(20.0F));
+    CHECK(detections->front().box.height == Catch::Approx(24.0F));
+    REQUIRE(detections->front().keypoints.size() == 5);
+    CHECK(detections->front().keypoints[0].x == Catch::Approx(14.0F));
+    CHECK(detections->front().keypoints[0].y == Catch::Approx(18.0F));
+}
+
+TEST_CASE("face detection pipeline decodes SCRFD stride outputs")
+{
+    StubScrfdBackendSession                       backend{};
+    cvkit::infer::detail::FaceDetectionPipeline   pipeline{};
+
+    cvkit::infer::detail::PipelineContext context{};
+    context.spec.task            = cvkit::infer::TaskKind::face_detection;
+    context.spec.family          = "scrfd";
+    context.confidence_threshold = 0.6F;
+    context.iou_threshold        = 0.4F;
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 64;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 64 * 3), 127U);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", cvkit::infer::ImageValue{frame});
+
+    const auto  output     = pipeline.run_sync(backend, input, context);
+    const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(detections != nullptr);
+    REQUIRE(detections->size() == 1);
+    const auto& face = detections->front();
+    CHECK(face.score == Catch::Approx(0.95F));
+    CHECK(face.box.x == Catch::Approx(0.0F));
+    CHECK(face.box.y == Catch::Approx(0.0F));
+    CHECK(face.box.width == Catch::Approx(20.0F));
+    CHECK(face.box.height == Catch::Approx(24.0F));
+    REQUIRE(face.keypoints.size() == 5);
+    CHECK(face.keypoints[0].x == Catch::Approx(4.0F));
+    CHECK(face.keypoints[0].y == Catch::Approx(4.0F));
+}
+
+TEST_CASE("face detection runs SCRFD ONNX model and returns five-point landmarks")
+{
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto model_path  = source_root / "assets" / "models" / "scrfd_10g.onnx";
+    const auto image_path  = source_root / "assets" / "images" / "test_001.jpg";
+
+    if (!std::filesystem::exists(model_path))
+    {
+        SKIP("scrfd_10g.onnx is not present under assets/models");
+    }
+
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path = model_path.string();
+    spec.backend    = cvkit::infer::Backend::onnxruntime;
+    spec.task       = cvkit::infer::TaskKind::face_detection;
+    spec.family     = "scrfd";
+
+    cvkit::infer::Model model;
+    model.set_confidence_threshold(0.02F);
+    model.set_iou_threshold(0.4F);
+    if (!model.load(spec))
+    {
+        SKIP("onnxruntime face detection backend is not available in this build");
+    }
+
+    const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
+    REQUIRE_FALSE(image.empty());
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
+    frame.desc.channels = image.channels();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
+    frame.data.assign(image.data, image.data + image.total() * image.elemSize());
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", frame);
+    const auto  output     = model.run_sync(input);
+    const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(detections != nullptr);
+    REQUIRE_FALSE(detections->empty());
+    CHECK(std::any_of(
+        detections->begin(),
+        detections->end(),
+        [](const cvkit::core::Detection& detection)
+        { return detection.keypoints.size() == 5; }));
+}
+
+TEST_CASE("face detection tiled model merges detections back to source coordinates")
+{
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto model_path  = source_root / "assets" / "models" / "scrfd_10g_ac133ba7.onnx";
+    const auto image_path  = source_root / "assets" / "images" / "face.jpg";
+
+    if (!std::filesystem::exists(model_path) || !std::filesystem::exists(image_path))
+    {
+        SKIP("scrfd_10g_ac133ba7.onnx or face.jpg is not present under assets");
+    }
+
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path = model_path.string();
+    spec.backend    = cvkit::infer::Backend::onnxruntime;
+    spec.task       = cvkit::infer::TaskKind::face_detection;
+    spec.family     = "scrfd_raw_bgr";
+
+    cvkit::infer::Model model;
+    model.set_confidence_threshold(0.5F);
+    model.set_iou_threshold(0.4F);
+    if (!model.load(spec))
+    {
+        SKIP("onnxruntime face detection backend is not available in this build");
+    }
+
+    const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
+    REQUIRE_FALSE(image.empty());
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
+    frame.desc.channels = image.channels();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
+    frame.data.assign(image.data, image.data + image.total() * image.elemSize());
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", frame);
+
+    const auto  full_output     = model.run_sync(input);
+    const auto* full_detections = full_output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(full_detections != nullptr);
+    REQUIRE_FALSE(full_detections->empty());
+
+    cvkit::infer::TileOptions tile_options{};
+    tile_options.enabled     = true;
+    tile_options.tile_width  = 640;
+    tile_options.tile_height = 640;
+    tile_options.overlap_x   = 160;
+    tile_options.overlap_y   = 160;
+    model.set_tile_options(tile_options);
+
+    const auto  tiled_output     = model.run_sync(input);
+    const auto* tiled_detections = tiled_output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(tiled_detections != nullptr);
+    CHECK(tiled_detections->size() >= full_detections->size());
+    CHECK(std::all_of(
+        tiled_detections->begin(),
+        tiled_detections->end(),
+        [&frame](const cvkit::core::Detection& detection)
+        {
+            return detection.box.x >= 0.0F &&
+                   detection.box.y >= 0.0F &&
+                   detection.box.x <= static_cast<float>(frame.desc.width) &&
+                   detection.box.y <= static_cast<float>(frame.desc.height);
+        }));
+}
+
+TEST_CASE("pose pipeline returns keypoints and scores")
+{
+    StubPoseBackendSession             backend{};
+    cvkit::infer::detail::PosePipeline pipeline{};
+
+    cvkit::infer::detail::PipelineContext context{};
+    context.spec.task   = cvkit::infer::TaskKind::pose;
+    context.spec.family = "pose";
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 8;
+    frame.desc.height   = 8;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(8 * 8 * 3), 127U);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", cvkit::infer::ImageValue{frame});
+
+    const auto  output    = pipeline.run_sync(backend, input, context);
+    const auto* keypoints = output.find<cvkit::infer::KeypointsValue>("keypoints");
+    const auto* scores    = output.find<std::vector<float>>("scores");
+    const auto* raw       = output.find<cvkit::infer::TensorValue>("raw");
+    REQUIRE(keypoints != nullptr);
+    REQUIRE(scores != nullptr);
+    REQUIRE(raw != nullptr);
+    REQUIRE(keypoints->points.size() == 3);
+    CHECK(keypoints->points[0].x == Catch::Approx(1.0F));
+    CHECK(keypoints->points[0].y == Catch::Approx(2.0F));
+    CHECK(scores->size() == 3);
+    CHECK(scores->at(1) == Catch::Approx(0.8F));
+    CHECK(raw->shape == std::vector<std::int64_t>{1, 3, 3});
+}
+
+TEST_CASE("facemesh pipeline returns landmarks and scores")
+{
+    StubFaceMeshBackendSession             backend{};
+    cvkit::infer::detail::FaceMeshPipeline pipeline{};
+
+    cvkit::infer::detail::PipelineContext context{};
+    context.spec.task   = cvkit::infer::TaskKind::facemesh;
+    context.spec.family = "facemesh";
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 16;
+    frame.desc.height   = 16;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(16 * 16 * 3), 127U);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", cvkit::infer::ImageValue{frame});
+
+    const auto  output    = pipeline.run_sync(backend, input, context);
+    const auto* landmarks = output.find<cvkit::infer::KeypointsValue>("landmarks");
+    const auto* scores    = output.find<std::vector<float>>("scores");
+    const auto* raw       = output.find<cvkit::infer::TensorValue>("raw");
+    REQUIRE(landmarks != nullptr);
+    REQUIRE(scores != nullptr);
+    REQUIRE(raw != nullptr);
+    REQUIRE(landmarks->points.size() == 2);
+    CHECK(landmarks->points[0].x == Catch::Approx(1.0F));
+    CHECK(landmarks->points[0].y == Catch::Approx(2.0F));
+    CHECK(scores->size() == 2);
+    CHECK(scores->at(1) == Catch::Approx(0.85F));
+    CHECK(raw->shape == std::vector<std::int64_t>{1, 2, 4});
 }
 
 TEST_CASE("backend input tensor contract currently requires host float32 tensors")

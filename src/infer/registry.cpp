@@ -1,13 +1,21 @@
 #include "cvkit/infer/tasks/classification.h"
 #include "cvkit/infer/tasks/detection.h"
+#include "cvkit/infer/tasks/face_detection.h"
+#include "cvkit/infer/tasks/facemesh.h"
+#include "cvkit/infer/tasks/pose.h"
 #include "cvkit/infer/tasks/promptable_segmentation.h"
+#include "cvkit/infer/tasks/segmentation.h"
 
 #include "backends/backend_session.h"
 #include "backends/onnxruntime/ort_session.h"
 #include "backends/tensorrt/trt_session.h"
 #include "tasks/classification/classification_pipeline.h"
 #include "tasks/detection/detection_pipeline.h"
+#include "tasks/face_detection/face_detection_pipeline.h"
+#include "tasks/facemesh/facemesh_pipeline.h"
+#include "tasks/pose/pose_pipeline.h"
 #include "tasks/promptable_segmentation/promptable_segmentation_pipeline.h"
+#include "tasks/segmentation/segmentation_pipeline.h"
 
 #include <memory>
 #include <string_view>
@@ -23,6 +31,14 @@ namespace cvkit::infer
             {IOField{"detections", ValueKind::detections, false}}};
     }
 
+    TaskSchema face_detection_schema()
+    {
+        return TaskSchema{
+            TaskKind::face_detection,
+            {IOField{"image", ValueKind::image, false}},
+            {IOField{"detections", ValueKind::detections, false}}};
+    }
+
     TaskSchema classification_schema()
     {
         return TaskSchema{
@@ -31,6 +47,41 @@ namespace cvkit::infer
             {
                 IOField{"classification", ValueKind::classification, false},
                 IOField{"scores", ValueKind::floats, true},
+            }};
+    }
+
+    TaskSchema segmentation_schema()
+    {
+        return TaskSchema{
+            TaskKind::segmentation,
+            {IOField{"image", ValueKind::image, false}},
+            {
+                IOField{"mask", ValueKind::mask, false},
+                IOField{"logits", ValueKind::tensor, true},
+            }};
+    }
+
+    TaskSchema pose_schema()
+    {
+        return TaskSchema{
+            TaskKind::pose,
+            {IOField{"image", ValueKind::image, false}},
+            {
+                IOField{"keypoints", ValueKind::keypoints, false},
+                IOField{"scores", ValueKind::floats, true},
+                IOField{"raw", ValueKind::tensor, true},
+            }};
+    }
+
+    TaskSchema facemesh_schema()
+    {
+        return TaskSchema{
+            TaskKind::facemesh,
+            {IOField{"image", ValueKind::image, false}},
+            {
+                IOField{"landmarks", ValueKind::keypoints, false},
+                IOField{"scores", ValueKind::floats, true},
+                IOField{"raw", ValueKind::tensor, true},
             }};
     }
 
@@ -81,8 +132,16 @@ namespace cvkit::infer::detail
         {
             case TaskKind::detection:
                 return std::make_unique<DetectionPipeline>();
+            case TaskKind::face_detection:
+                return std::make_unique<FaceDetectionPipeline>();
             case TaskKind::classification:
                 return std::make_unique<ClassificationPipeline>();
+            case TaskKind::segmentation:
+                return std::make_unique<SegmentationPipeline>();
+            case TaskKind::pose:
+                return std::make_unique<PosePipeline>();
+            case TaskKind::facemesh:
+                return std::make_unique<FaceMeshPipeline>();
             case TaskKind::promptable_segmentation:
                 return std::make_unique<PromptableSegmentationPipeline>();
             case TaskKind::unknown:

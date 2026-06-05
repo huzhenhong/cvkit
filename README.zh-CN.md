@@ -58,16 +58,15 @@ app
 
 - 已实现任务：
   - detection
+  - face detection
   - classification
+  - segmentation
+  - pose
+  - facemesh
   - promptable segmentation
 - 已实现 backend：
   - onnxruntime
   - tensorrt
-- 已规划但尚未实现的任务族：
-  - segmentation
-  - pose
-  - facemesh
-
 ## 构建开关
 
 本地目标开关：
@@ -269,6 +268,145 @@ build/conan/Release/examples/bin/cvkit_example_classification \
   --print-graph
 ```
 
+## Face Detection Example
+
+示例可执行文件：
+
+- `build/conan/Release/examples/bin/cvkit_example_face_detection`
+
+当前支持的 CLI 参数：
+
+- `--model`
+- `--image`
+- `--output-dir`
+- `--infer-backend onnxruntime|tensorrt`
+- `--family scrfd|scrfd_raw_bgr`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+- `--conf`
+- `--iou`
+- `--tile-width`
+- `--tile-height`
+- `--tile-overlap-x`
+- `--tile-overlap-y`
+
+示例：
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_face_detection \
+  --model assets/models/scrfd_10g_ac133ba7.onnx \
+  --image assets/images/face.jpg \
+  --output-dir assets/output \
+  --infer-backend onnxruntime \
+  --family scrfd_raw_bgr \
+  --conf 0.5 \
+  --iou 0.4 \
+  --tile-width 640 \
+  --tile-height 640 \
+  --tile-overlap-x 160 \
+  --tile-overlap-y 160 \
+  --print-graph
+```
+
+`scrfd_raw_bgr` 保留工程 SCRFD 前处理约定：直接 resize、BGR planar 输入、`[0, 255]` 原始 `float32` 数值，不做 RGB 交换，也不做归一化。tile 参数启用 Model 层分块推理，并把检测结果合并回原图坐标。
+
+仓库里的 `assets/models/scrfd_10g.pth` 是 PyTorch/MMDetection checkpoint，不能直接被 ONNX Runtime 或 TensorRT 加载。需要先在具备 SCRFD/MMDetection 依赖的 Python 环境里导出 ONNX：
+
+```bash
+cd /workspace/cvkit
+scripts/export_scrfd_onnx.sh assets/models/scrfd_10g.pth assets/models/scrfd_10g.onnx
+```
+
+## Segmentation Example
+
+示例可执行文件：
+
+- `build/conan/Release/examples/bin/cvkit_example_segmentation`
+
+当前支持的 CLI 参数：
+
+- `--model`
+- `--image`
+- `--output-dir`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+示例：
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_segmentation \
+  --model /path/to/segmentation.onnx \
+  --image assets/images/test_001.jpg \
+  --output-dir assets/output \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
+## Pose Example
+
+示例可执行文件：
+
+- `build/conan/Release/examples/bin/cvkit_example_pose`
+
+当前支持的 CLI 参数：
+
+- `--model`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+示例：
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_pose \
+  --model /path/to/pose.onnx \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
+## FaceMesh Example
+
+示例可执行文件：
+
+- `build/conan/Release/examples/bin/cvkit_example_facemesh`
+
+当前支持的 CLI 参数：
+
+- `--model`
+- `--image`
+- `--infer-backend onnxruntime|tensorrt`
+- `--cache-policy default|disabled|read-only|rebuild`
+- `--cache-dir`
+- `--async`
+- `--print-graph`
+- `--dump-graph-json`
+
+示例：
+
+```bash
+cd /workspace/cvkit
+build/conan/Release/examples/bin/cvkit_example_facemesh \
+  --model /path/to/facemesh.onnx \
+  --image assets/images/test_001.jpg \
+  --infer-backend onnxruntime \
+  --print-graph
+```
+
 TensorRT cache 规则：
 
 - 默认 cache 根目录：
@@ -323,6 +461,51 @@ TensorRT cache 规则：
   - 现在已经有 example 入口：
     - `build/conan/Release/examples/bin/cvkit_example_classification`
   - 仓库里目前还没有内置 classification 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
+- segmentation 第一阶段状态：
+  - 当前 pipeline 是 host-first、task-oriented 的最小实现
+  - 输入图像会在 CPU 侧完成 resize 和 normalize
+  - 当前把 backend 输出视作 `NCHW` 类别 logits
+  - 当前输出：
+    - `mask`
+    - `logits`
+  - 现在已经有 example 入口：
+    - `build/conan/Release/examples/bin/cvkit_example_segmentation`
+  - 仓库里目前还没有内置 segmentation 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
+- face detection 第一阶段状态：
+  - 当前 pipeline 是 host-first、task-oriented 的最小实现
+  - 主要用于 SCRFD 这类同时输出 bbox、score 和稀疏人脸关键点的模型
+  - 当前支持 SCRFD 9 输出 ONNX：
+    - `score_8`、`score_16`、`score_32`
+    - `bbox_8`、`bbox_16`、`bbox_32`
+    - `kps_8`、`kps_16`、`kps_32`
+  - 当前输出：
+    - `detections`
+  - 每个 `Detection` 现在可以携带 `keypoints`，因此单个人脸结果可以同时表达 bbox + score + 5 个关键点
+  - 现在已经有 example 入口：
+    - `build/conan/Release/examples/bin/cvkit_example_face_detection`
+  - 仓库里目前还没有内置 face detection 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
+- pose 第一阶段状态：
+  - 当前 pipeline 是 host-first、task-oriented 的最小实现
+  - 输入图像会在 CPU 侧完成 resize 和 normalize
+  - 当前把 backend 第一个输出解释为 packed keypoint 坐标和可选 score
+  - 当前输出：
+    - `keypoints`
+    - `scores`
+    - `raw`
+  - 现在已经有 example 入口：
+    - `build/conan/Release/examples/bin/cvkit_example_pose`
+  - 仓库里目前还没有内置 pose 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
+- facemesh 第一阶段状态：
+  - 当前 pipeline 是 host-first、task-oriented 的最小实现
+  - 输入图像会在 CPU 侧完成 resize 和 normalize
+  - 当前把 backend 第一个输出解释为 packed landmark 坐标和可选 score
+  - 当前输出：
+    - `landmarks`
+    - `scores`
+    - `raw`
+  - 现在已经有 example 入口：
+    - `build/conan/Release/examples/bin/cvkit_example_facemesh`
+  - 仓库里目前还没有内置 facemesh 模型资源，因此当前覆盖主要来自聚焦单测和 stub backend
 - promptable segmentation decoder 现在也可以消费 CUDA-resident 的 `image_embeddings`，并在进入当前 ONNX Runtime 执行路径前 materialize 回 host
 - promptable segmentation 的 encoder 和 combined 路径现在也可以接受 CUDA-resident 的 `ImageValue` 输入；当前 ONNX Runtime 执行仍会先 materialize 回 host 再喂 encoder
 - 当 ONNX Runtime session 通过 `ModelSpec.device.kind = cuda` 加载时，promptable decoder 的 CUDA-resident embeddings 现在也可以走真正的 ORT CUDA tensor 输入路径，而不再总是先回拷到 host
@@ -553,7 +736,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
 - 从 example 支持层抽离成正式生产级 writer 抽象
 - 更通用的非 host / 非 float32 tensor 执行路径
 - 正式的 GPU preprocess 与更完整的 device-resident 数据流
-- detection / classification / promptable segmentation 之外的更多任务族
+- detection / classification / segmentation / promptable segmentation 之外的更多任务族
 - 超出当前 metadata-only `storage` contract 的更强 external-view / zero-copy 所有权模型
 
 ## 下一步计划
@@ -565,10 +748,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
 - 从“只有 metadata 感知”逐步推进到真实的 GPU preprocess 支持
 - 继续收紧 backend tensor-engine contract
   - 尤其是 non-host 和 non-float32 执行支持
-- 扩展任务覆盖范围
-  - segmentation
-  - pose
-  - facemesh
+- 选定具体模型资源后，为 pose 和 facemesh 补模型族 adapter
 
 范围说明：
 
@@ -596,6 +776,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
   - 如果资源齐全，再运行一次图片 pipeline smoke test
 - `cvkit_package.sh`
   - 对 `cvkit` 执行 `conan create`
+  - 构建并运行 `test_package`，验证 package 态 public headers、component targets、聚合 `cvkit::cvkit` target、task schemas 和 `TileOptions`，不依赖模型资源
   - 如果没有检测到系统 OpenCV 或 ONNX Runtime，会优雅跳过
 - `all.sh`
   - 顺序执行上述两条脚本

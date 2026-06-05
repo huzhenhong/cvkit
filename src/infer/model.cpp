@@ -4,6 +4,7 @@
 #include "backends/backend_session.h"
 #include "graph/graph.h"
 #include "tasks/task_pipeline.h"
+#include "tile_runner.h"
 #include "utils/labels.h"
 
 #include <memory>
@@ -32,6 +33,7 @@ namespace cvkit::infer
         std::vector<std::string>                 labels_{};
         float                                    confidence_threshold_{0.25F};
         float                                    iou_threshold_{0.45F};
+        TileOptions                              tile_options_{};
         bool                                     loaded_{false};
     };
 
@@ -73,8 +75,16 @@ namespace cvkit::infer
             {
                 case TaskKind::detection:
                     return "yolo11";
+                case TaskKind::face_detection:
+                    return "scrfd";
                 case TaskKind::classification:
                     return "classification";
+                case TaskKind::segmentation:
+                    return "segmentation";
+                case TaskKind::pose:
+                    return "pose";
+                case TaskKind::facemesh:
+                    return "facemesh";
                 case TaskKind::promptable_segmentation:
                     return "sam";
                 case TaskKind::unknown:
@@ -340,11 +350,33 @@ namespace cvkit::infer
         return impl_->iou_threshold_;
     }
 
+    void Model::set_tile_options(const TileOptions& options)
+    {
+        impl_->tile_options_ = options;
+    }
+
+    TileOptions Model::tile_options() const
+    {
+        return impl_->tile_options_;
+    }
+
     TaskOutput Model::run_sync(const TaskInput& input) const
     {
         if (!has_runtime_state(*impl_))
         {
             return {};
+        }
+
+        const auto* tile_source = detail::find_tiled_source_frame(input);
+        if (detail::should_run_tiled(impl_->spec_.task, impl_->tile_options_, tile_source))
+        {
+            return detail::run_tiled_sync(
+                impl_->backend_,
+                impl_->pipeline_,
+                make_pipeline_context(*impl_),
+                input,
+                impl_->tile_options_,
+                *tile_source);
         }
 
         auto           graph = make_pipeline_graph(*impl_);
@@ -367,6 +399,34 @@ namespace cvkit::infer
         auto           copied_input = input;
         auto           context      = make_pipeline_context(*impl_);
         auto           trace_state  = impl_->trace_state_;
+        auto           tile_options = impl_->tile_options_;
+        const auto*    tile_source  = detail::find_tiled_source_frame(input);
+        if (detail::should_run_tiled(context.spec.task, tile_options, tile_source))
+        {
+            auto source_frame = std::make_shared<cvkit::core::Frame>(*tile_source);
+            auto shared_input = std::make_shared<TaskInput>(std::move(copied_input));
+            auto shared_context = std::make_shared<detail::PipelineContext>(std::move(context));
+            clear_last_trace(trace_state);
+            return impl_->executor_->submit(
+                [
+                    backend = std::move(backend),
+                    pipeline = std::move(pipeline),
+                    shared_input = std::move(shared_input),
+                    shared_context = std::move(shared_context),
+                    tile_options,
+                    source_frame = std::move(source_frame)
+                ]()
+                {
+                    return detail::run_tiled_sync(
+                        backend,
+                        pipeline,
+                        *shared_context,
+                        *shared_input,
+                        tile_options,
+                        *source_frame);
+                });
+        }
+
         auto           graph        = detail::create_pipeline_graph(std::move(backend), std::move(pipeline), std::move(context));
         detail::Packet packet{};
         packet.input = std::move(copied_input);

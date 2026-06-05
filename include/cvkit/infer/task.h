@@ -11,7 +11,11 @@ namespace cvkit::infer
     {
         unknown,
         detection,
+        face_detection,
         classification,
+        segmentation,
+        pose,
+        facemesh,
         promptable_segmentation,
     };
 

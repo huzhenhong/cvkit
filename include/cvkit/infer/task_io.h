@@ -36,6 +36,7 @@ namespace cvkit::infer
         std::size_t        row_stride_bytes{0};
         const void*        external_data{nullptr};
         std::size_t        storage_bytes{0};
+        std::shared_ptr<void> storage_owner{};
 
         [[nodiscard]] bool is_host_accessible() const
         {
@@ -113,6 +114,36 @@ namespace cvkit::infer
             return required > 0U && storage_bytes >= required;
         }
     };
+
+    inline ImageValue image_value_from_device_frame(const cvkit::core::DeviceFrame& frame)
+    {
+        ImageValue image{};
+        image.frame.desc = frame.desc;
+        image.frame.pts = frame.pts;
+        image.frame.source = frame.source;
+        switch (frame.memory_device)
+        {
+            case cvkit::core::MemoryDevice::cuda:
+                image.memory_device = MemoryDevice::cuda;
+                image.device = DeviceRef{DeviceKind::cuda, frame.device_index};
+                break;
+            case cvkit::core::MemoryDevice::npu:
+                image.memory_device = MemoryDevice::npu;
+                image.device = DeviceRef{DeviceKind::npu, frame.device_index};
+                break;
+            case cvkit::core::MemoryDevice::host:
+            default:
+                image.memory_device = MemoryDevice::host;
+                image.device = DeviceRef{DeviceKind::cpu, frame.device_index};
+                break;
+        }
+        image.storage = StorageKind::external_view;
+        image.row_stride_bytes = frame.stride_bytes;
+        image.external_data = reinterpret_cast<const void*>(frame.data);
+        image.storage_bytes = frame.bytes;
+        image.storage_owner = frame.owner;
+        return image;
+    }
 
     struct BK_INFER_EXPORT MaskValue
     {

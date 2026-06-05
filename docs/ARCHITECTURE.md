@@ -120,6 +120,8 @@ Current behavior:
 - the source image is cropped into overlapping host tiles
 - each tile reuses the same loaded task pipeline and backend session
 - tile outputs are merged back into source-image coordinates
+- `last_graph_trace()` records one aggregate `tiled_inference` entry plus one `tile_N` entry per tile for both `run_sync(...)` and `submit(...)`
+- graph JSON version `6` includes structured top-level `tiling` metadata and per-trace `tile_info`, while keeping the readable trace message
 
 Current merge support:
 
@@ -139,7 +141,7 @@ Current limitations:
 
 - tiling is host-only today; CUDA/NPU tiled source views are planned, not implemented
 - promptable segmentation is intentionally not tiled yet because prompts, embeddings, and mask merging need task-aware coordinate handling
-- tiled runs currently bypass detailed graph trace aggregation; graph tracing remains strongest for the non-tiled path
+- tiled trace is aggregate/per-tile oriented; it does not yet expose full internal task-graph node traces for each tile
 - overlap mask merging is simple paste behavior, not weighted blending
 
 The design goal is to let every task opt into the same tiling mechanism where the output semantics are mergeable, while keeping model-family details in task pipelines.
@@ -220,6 +222,49 @@ Backend sessions are not responsible for:
 - detection postprocess
 - promptable segmentation prompt-building semantics
 - example formatting or file export
+
+## Media Runtime
+
+`cvkit::media` is currently a lightweight frame I/O layer, not a generalized streaming graph runtime.
+
+Current public media API:
+
+- `cvkit::media::Source`
+- `cvkit::media::SourceOptions`
+- `cvkit::media::ReaderBackend`
+- `cvkit::media::WriterOptions`
+- `cvkit::media::WriterBackend`
+
+Current implemented reader behavior:
+
+- `Source` supports host `cvkit::core::Frame` output
+- `Source` supports CUDA `cvkit::core::DeviceFrame` output for GStreamer/NVDEC H.264 sources when `SourceOptions::output_memory=SourceMemory::cuda`
+- `ReaderBackend::opencv` supports image files and video streams through OpenCV
+- GStreamer reader support is implemented when `CVKIT_ENABLE_GSTREAMER=ON`
+- `ReaderBackend::ffmpeg` is reserved, not implemented yet
+- frame output is currently host-owned packed image data
+- device-frame output carries an opaque owner to keep the backend buffer/map alive while downstream code consumes the pointer
+- `Source::is_open()`, `Source::status()`, `Source::status_message()`, and `Source::info()` expose source state plus basic video metadata such as fps, frame count, and frame index
+- `cvkit::media::runtime_capabilities(cuda_device_index)` reports available GStreamer/CUDA decode elements without requiring the caller to shell out to `gst-inspect-1.0`
+
+Media is intentionally not modeled as "create one graph node per frame". The preferred direction is:
+
+- keep source lifetime outside the infer task graph
+- read frames from a long-lived `Source` / future stream abstraction
+- submit each frame or batch into infer models/tasks
+- add queueing, backpressure, timestamps, and device memory handling in the media/runtime layer where needed
+
+Near-term media work should focus on:
+
+- deterministic EOF/error reporting instead of only `bool`
+- basic writer API symmetry with reader options
+- video-file EOF, timestamp, fps, and frame-index coverage
+- optional GStreamer/CUDA decode path design without forcing it into the infer graph
+- keep `DeviceFrame` NV12 output wired through YOLO CUDA preprocess and TensorRT smoke coverage
+- keep avoiding implicit `cudadownload`; host fallback must remain explicit
+- current first CUDA media-to-infer bridge supports NV12 `DeviceFrame` input through YOLO CUDA preprocess, TensorRT input, and host postprocess
+- GPU smoke scripts select the physical GPU through `CUDA_VISIBLE_DEVICES`; process-local device indices should normally remain `0`
+- annotated image export for the GPU video example is an explicit debug/export path that downloads one selected NV12 frame
 
 ### Backend Session Contract
 

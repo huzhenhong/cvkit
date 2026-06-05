@@ -2,6 +2,7 @@
 
 #include "cvkit/media/media_export.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -30,10 +31,18 @@ namespace cvkit::media
         nvv4l2h264,
     };
 
+    enum class BK_MEDIA_EXPORT SourceMemory : std::uint8_t
+    {
+        host,
+        cuda,
+    };
+
     struct BK_MEDIA_EXPORT SourceOptions
     {
         std::string   uri{};
-        ReaderBackend backend{ReaderBackend::gstreamer};
+        ReaderBackend backend{ReaderBackend::opencv};
+        SourceMemory  output_memory{SourceMemory::host};
+        int           cuda_device_index{0};
     };
 
     struct BK_MEDIA_EXPORT WriterOptions

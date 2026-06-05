@@ -23,6 +23,8 @@ target_link_libraries(cvkit_media
     PUBLIC
         cvkit::core
         basekit::log
+    PRIVATE
+        ${OpenCV_LIBS}
 )
 
 target_compile_features(cvkit_media PUBLIC cxx_std_17)

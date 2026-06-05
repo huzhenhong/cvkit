@@ -85,6 +85,88 @@ namespace cvkit::infer
             stream << ']';
         }
 
+        void append_json_tile_trace_info(std::ostringstream& stream, const TileTraceInfo& info)
+        {
+            stream << "{";
+            stream << "\"aggregate\":" << (info.aggregate ? "true" : "false") << ",";
+            stream << "\"tile_count\":" << info.tile_count << ",";
+            stream << "\"source_width\":" << info.source_width << ",";
+            stream << "\"source_height\":" << info.source_height << ",";
+            stream << "\"tile_width\":" << info.tile_width << ",";
+            stream << "\"tile_height\":" << info.tile_height << ",";
+            stream << "\"overlap_x\":" << info.overlap_x << ",";
+            stream << "\"overlap_y\":" << info.overlap_y << ",";
+            stream << "\"tile_index\":" << info.tile_index << ",";
+            stream << "\"x\":" << info.x << ",";
+            stream << "\"y\":" << info.y << ",";
+            stream << "\"width\":" << info.width << ",";
+            stream << "\"height\":" << info.height << ",";
+            stream << "\"output_count\":" << info.output_count;
+            stream << "}";
+        }
+
+        const GraphTraceInfo* find_tiling_summary(const std::vector<GraphTraceInfo>& trace)
+        {
+            for (const auto& node : trace)
+            {
+                if (node.has_tile_info && node.tile_info.aggregate)
+                {
+                    return &node;
+                }
+            }
+            return nullptr;
+        }
+
+        void append_json_tiling_summary(
+            std::ostringstream&                stream,
+            const std::vector<GraphTraceInfo>& trace)
+        {
+            const auto* summary = find_tiling_summary(trace);
+            if (summary == nullptr)
+            {
+                stream << "null";
+                return;
+            }
+
+            const auto& info = summary->tile_info;
+            stream << "{\n";
+            stream << "    \"tile_count\": " << info.tile_count << ",\n";
+            stream << "    \"source_width\": " << info.source_width << ",\n";
+            stream << "    \"source_height\": " << info.source_height << ",\n";
+            stream << "    \"tile_width\": " << info.tile_width << ",\n";
+            stream << "    \"tile_height\": " << info.tile_height << ",\n";
+            stream << "    \"overlap_x\": " << info.overlap_x << ",\n";
+            stream << "    \"overlap_y\": " << info.overlap_y << ",\n";
+            stream << "    \"duration_us\": " << summary->duration_us << ",\n";
+            stream << "    \"tiles\": [\n";
+            bool first = true;
+            for (const auto& node : trace)
+            {
+                if (!node.has_tile_info || node.tile_info.aggregate)
+                {
+                    continue;
+                }
+                if (!first)
+                {
+                    stream << ",\n";
+                }
+                const auto& tile = node.tile_info;
+                stream << "      {";
+                stream << "\"tile_index\": " << tile.tile_index << ",";
+                stream << " \"x\": " << tile.x << ",";
+                stream << " \"y\": " << tile.y << ",";
+                stream << " \"width\": " << tile.width << ",";
+                stream << " \"height\": " << tile.height << ",";
+                stream << " \"output_count\": " << tile.output_count << ",";
+                stream << " \"duration_us\": " << node.duration_us;
+                stream << "}";
+                first = false;
+            }
+            stream << "\n";
+            stream << "    ]\n";
+            stream << "  }";
+        }
+
         void print_session_tensor_list(
             std::ostream&                  stream,
             std::string_view               label,
@@ -326,7 +408,7 @@ namespace cvkit::infer
 
         std::ostringstream stream;
         stream << "{\n";
-        stream << "  \"version\": 5,\n";
+        stream << "  \"version\": 6,\n";
         stream << "  \"task\": \"" << task_name(model.task()) << "\",\n";
         stream << "  \"backend\": \"" << backend_name(model.backend()) << "\",\n";
         stream << "  \"family\": \"" << json_escape(model.family()) << "\",\n";
@@ -383,6 +465,9 @@ namespace cvkit::infer
         append_json_string_array(stream, graph.boundary.outputs);
         stream << '\n';
         stream << "  },\n";
+        stream << "  \"tiling\": ";
+        append_json_tiling_summary(stream, trace);
+        stream << ",\n";
         stream << "  \"trace\": [\n";
         for (std::size_t index = 0; index < trace.size(); ++index)
         {
@@ -395,7 +480,18 @@ namespace cvkit::infer
             stream << "      \"scratch_count\": " << node.scratch_count << ",\n";
             stream << "      \"duration_us\": " << node.duration_us << ",\n";
             stream << "      \"ok\": " << (node.ok ? "true" : "false") << ",\n";
-            stream << "      \"message\": \"" << json_escape(node.message) << "\"\n";
+            stream << "      \"message\": \"" << json_escape(node.message) << "\"";
+            if (node.has_tile_info)
+            {
+                stream << ",\n";
+                stream << "      \"tile_info\": ";
+                append_json_tile_trace_info(stream, node.tile_info);
+                stream << '\n';
+            }
+            else
+            {
+                stream << '\n';
+            }
             stream << "    }";
             if (index + 1 < trace.size())
             {

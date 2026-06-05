@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cvkit/core/types.h"
+#include "cvkit/infer/infer_export.h"
 #include "../../../backends/backend_session.h"
 
 namespace cvkit::infer::detail
@@ -16,7 +17,7 @@ namespace cvkit::infer::detail
         int       input_height{0};
     };
 
-    [[nodiscard]] LetterboxResult preprocess_yolo_cpu(
+    [[nodiscard]] BK_INFER_EXPORT LetterboxResult preprocess_yolo_cpu(
         const cvkit::core::Frame&        frame,
         const std::vector<std::int64_t>& input_shape);
 

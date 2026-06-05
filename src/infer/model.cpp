@@ -188,6 +188,15 @@ namespace cvkit::infer
             trace_state->last_trace.clear();
         }
 
+        template<typename TraceStateT>
+        void store_last_trace(
+            const std::shared_ptr<TraceStateT>& trace_state,
+            std::vector<GraphTraceInfo>         trace)
+        {
+            std::lock_guard<std::mutex> lock(trace_state->mutex);
+            trace_state->last_trace = std::move(trace);
+        }
+
     }  // namespace
 
     Model::Model()
@@ -370,13 +379,15 @@ namespace cvkit::infer
         const auto* tile_source = detail::find_tiled_source_frame(input);
         if (detail::should_run_tiled(impl_->spec_.task, impl_->tile_options_, tile_source))
         {
-            return detail::run_tiled_sync(
+            auto result = detail::run_tiled_sync(
                 impl_->backend_,
                 impl_->pipeline_,
                 make_pipeline_context(*impl_),
                 input,
                 impl_->tile_options_,
                 *tile_source);
+            store_last_trace(impl_->trace_state_, std::move(result.trace));
+            return std::move(result.output);
         }
 
         auto           graph = make_pipeline_graph(*impl_);
@@ -414,16 +425,19 @@ namespace cvkit::infer
                     shared_input = std::move(shared_input),
                     shared_context = std::move(shared_context),
                     tile_options,
+                    trace_state,
                     source_frame = std::move(source_frame)
                 ]()
                 {
-                    return detail::run_tiled_sync(
+                    auto result = detail::run_tiled_sync(
                         backend,
                         pipeline,
                         *shared_context,
                         *shared_input,
                         tile_options,
                         *source_frame);
+                    store_last_trace(trace_state, std::move(result.trace));
+                    return std::move(result.output);
                 });
         }
 

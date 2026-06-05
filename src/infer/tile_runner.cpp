@@ -3,9 +3,12 @@
 #include "utils/nms.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -20,6 +23,73 @@ namespace cvkit::infer::detail
             int                x{0};
             int                y{0};
         };
+
+        std::uint64_t elapsed_us(std::chrono::steady_clock::time_point begin)
+        {
+            const auto elapsed = std::chrono::steady_clock::now() - begin;
+            return static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count());
+        }
+
+        std::string tile_summary_message(
+            const TileOptions&        options,
+            const cvkit::core::Frame& source_frame,
+            std::size_t               tile_count)
+        {
+            std::ostringstream stream;
+            stream << "tiles=" << tile_count
+                   << " source=" << source_frame.desc.width << 'x' << source_frame.desc.height
+                   << " tile=" << options.tile_width << 'x' << options.tile_height
+                   << " overlap=" << options.overlap_x << 'x' << options.overlap_y;
+            return stream.str();
+        }
+
+        std::string tile_window_message(
+            const TileWindow& window,
+            std::size_t       tile_index,
+            std::size_t       output_count)
+        {
+            std::ostringstream stream;
+            stream << "tile_index=" << tile_index
+                   << " x=" << window.x
+                   << " y=" << window.y
+                   << " width=" << window.frame.desc.width
+                   << " height=" << window.frame.desc.height
+                   << " output_items=" << output_count;
+            return stream.str();
+        }
+
+        TileTraceInfo make_aggregate_tile_info(
+            const TileOptions&        options,
+            const cvkit::core::Frame& source_frame,
+            std::size_t               tile_count)
+        {
+            TileTraceInfo info{};
+            info.aggregate = true;
+            info.tile_count = tile_count;
+            info.source_width = source_frame.desc.width;
+            info.source_height = source_frame.desc.height;
+            info.tile_width = options.tile_width;
+            info.tile_height = options.tile_height;
+            info.overlap_x = options.overlap_x;
+            info.overlap_y = options.overlap_y;
+            return info;
+        }
+
+        TileTraceInfo make_window_tile_info(
+            const TileWindow& window,
+            std::size_t       tile_index,
+            std::size_t       output_count)
+        {
+            TileTraceInfo info{};
+            info.tile_index = static_cast<int>(tile_index);
+            info.x = window.x;
+            info.y = window.y;
+            info.width = window.frame.desc.width;
+            info.height = window.frame.desc.height;
+            info.output_count = output_count;
+            return info;
+        }
 
         bool tile_options_enabled(const TileOptions& options, const cvkit::core::Frame& frame)
         {
@@ -429,7 +499,7 @@ namespace cvkit::infer::detail
         return supports_tiled_task(task) && frame != nullptr && tile_options_enabled(options, *frame);
     }
 
-    TaskOutput run_tiled_sync(
+    TiledRunResult run_tiled_sync(
         const std::shared_ptr<IBackendSession>& backend,
         const std::shared_ptr<ITaskPipeline>&   pipeline,
         const PipelineContext&                  context,
@@ -437,21 +507,61 @@ namespace cvkit::infer::detail
         const TileOptions&                      options,
         const cvkit::core::Frame&               source_frame)
     {
-        const auto windows = build_tile_windows(source_frame, options);
+        TiledRunResult result{};
+        const auto     total_begin = std::chrono::steady_clock::now();
+        const auto     windows     = build_tile_windows(source_frame, options);
         if (windows.empty())
         {
-            return {};
+            return result;
         }
 
         std::vector<std::pair<TileWindow, TaskOutput>> tile_outputs;
         tile_outputs.reserve(windows.size());
+        result.trace.reserve(windows.size() + 1U);
+
+        std::size_t sequence   = 1U;
+        std::size_t tile_index = 0U;
         for (auto window : windows)
         {
+            const auto tile_begin = std::chrono::steady_clock::now();
             auto tile_input = make_tile_input(input, window.frame);
             auto tile_output = pipeline->run_sync(*backend, tile_input, context);
+            const auto output_count = tile_output.items.size();
+            GraphTraceInfo trace_info{
+                "tile_" + std::to_string(tile_index),
+                sequence++,
+                tile_input.items.size(),
+                output_count,
+                0U,
+                elapsed_us(tile_begin),
+                true,
+                tile_window_message(window, tile_index, output_count)};
+            trace_info.has_tile_info = true;
+            trace_info.tile_info = make_window_tile_info(window, tile_index, output_count);
+            result.trace.push_back(std::move(trace_info));
             tile_outputs.push_back(std::make_pair(std::move(window), std::move(tile_output)));
+            ++tile_index;
         }
-        return merge_tile_outputs(tile_outputs, source_frame, context.spec.task, context.labels, context.iou_threshold);
+
+        result.output = merge_tile_outputs(
+            tile_outputs,
+            source_frame,
+            context.spec.task,
+            context.labels,
+            context.iou_threshold);
+        GraphTraceInfo aggregate_trace{
+            "tiled_inference",
+            0U,
+            input.items.size(),
+            result.output.items.size(),
+            windows.size(),
+            elapsed_us(total_begin),
+            true,
+            tile_summary_message(options, source_frame, windows.size())};
+        aggregate_trace.has_tile_info = true;
+        aggregate_trace.tile_info = make_aggregate_tile_info(options, source_frame, windows.size());
+        result.trace.insert(result.trace.begin(), std::move(aggregate_trace));
+        return result;
     }
 
 }  // namespace cvkit::infer::detail

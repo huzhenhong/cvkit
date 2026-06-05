@@ -84,6 +84,24 @@ namespace cvkit::infer
         GraphBoundaryInfo          boundary{};
     };
 
+    struct BK_INFER_EXPORT TileTraceInfo
+    {
+        bool        aggregate{false};
+        std::size_t tile_count{0};
+        int         source_width{0};
+        int         source_height{0};
+        int         tile_width{0};
+        int         tile_height{0};
+        int         overlap_x{0};
+        int         overlap_y{0};
+        int         tile_index{-1};
+        int         x{0};
+        int         y{0};
+        int         width{0};
+        int         height{0};
+        std::size_t output_count{0};
+    };
+
     struct BK_INFER_EXPORT GraphTraceInfo
     {
         std::string   name{};
@@ -94,6 +112,8 @@ namespace cvkit::infer
         std::uint64_t duration_us{0};
         bool          ok{true};
         std::string   message{};
+        bool          has_tile_info{false};
+        TileTraceInfo tile_info{};
     };
 
     class BK_INFER_EXPORT Model

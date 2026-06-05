@@ -17,6 +17,43 @@ set_target_properties(cvkit_test_core PROPERTIES
 )
 catch_discover_tests(cvkit_test_core)
 
+add_executable(cvkit_test_media
+    test_media.cpp
+)
+
+target_link_libraries(cvkit_test_media
+    PRIVATE
+        cvkit::media
+        Catch2::Catch2WithMain
+)
+
+target_compile_features(cvkit_test_media PRIVATE cxx_std_17)
+set_target_properties(cvkit_test_media PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+catch_discover_tests(cvkit_test_media)
+
+add_executable(cvkit_test_media_infer
+    test_media_infer.cpp
+)
+
+target_link_libraries(cvkit_test_media_infer
+    PRIVATE
+        cvkit::media
+        cvkit::infer
+        Catch2::Catch2WithMain
+)
+
+if(CVKIT_ENABLE_CUDA_LANGUAGE)
+    target_compile_definitions(cvkit_test_media_infer PRIVATE CVKIT_WITH_CUDA_PREPROCESS_KERNEL=1)
+endif()
+
+target_compile_features(cvkit_test_media_infer PRIVATE cxx_std_17)
+set_target_properties(cvkit_test_media_infer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
+)
+catch_discover_tests(cvkit_test_media_infer)
+
 add_executable(cvkit_test_infer
     test_infer.cpp
 )
@@ -31,6 +68,10 @@ target_link_libraries(cvkit_test_infer
 if(TARGET CUDA::cudart)
     target_compile_definitions(cvkit_test_infer PRIVATE CVKIT_WITH_CUDA_RUNTIME=1)
     target_link_libraries(cvkit_test_infer PRIVATE CUDA::cudart)
+endif()
+
+if(CVKIT_ENABLE_CUDA_LANGUAGE)
+    target_compile_definitions(cvkit_test_infer PRIVATE CVKIT_WITH_CUDA_PREPROCESS_KERNEL=1)
 endif()
 
 if(CVKIT_ENABLE_TENSORRT)

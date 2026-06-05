@@ -2,7 +2,9 @@
 
 #include "cvkit/core/core_export.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,6 +16,14 @@ namespace cvkit::core
         unknown,
         bgr8,
         rgb8,
+        nv12,
+    };
+
+    enum class BK_CORE_EXPORT MemoryDevice : std::uint8_t
+    {
+        host,
+        cuda,
+        npu,
     };
 
     struct BK_CORE_EXPORT ImageDesc
@@ -30,6 +40,24 @@ namespace cvkit::core
         std::vector<uint8_t> data{};
         std::int64_t         pts{0};
         std::string          source{};
+    };
+
+    struct BK_CORE_EXPORT DeviceFrame
+    {
+        ImageDesc             desc{};
+        std::uintptr_t        data{0};
+        std::size_t           bytes{0};
+        std::size_t           stride_bytes{0};
+        MemoryDevice          memory_device{MemoryDevice::host};
+        int                   device_index{0};
+        std::int64_t          pts{0};
+        std::string           source{};
+        std::shared_ptr<void> owner{};
+
+        bool valid() const
+        {
+            return data != 0 && bytes > 0 && owner != nullptr;
+        }
     };
 
     struct BK_CORE_EXPORT BBox

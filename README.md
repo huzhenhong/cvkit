@@ -4,6 +4,7 @@
 
 Architecture details:
 
+- `docs/STATUS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_STYLE.md`
 
@@ -21,6 +22,7 @@ Current focus:
 - YOLO11 detection with ONNX Runtime and TensorRT
 - EfficientSAM-style promptable segmentation with encoder/decoder split
 - image/video input with selectable media backends
+- GStreamer/NVDEC capability probing for the upcoming device-frame media path
 - graph-aware async execution, tracing, and JSON export
 - clean separation between domain APIs and third-party implementations
 
@@ -29,7 +31,7 @@ Current focus:
 - `cvkit::core`
   - vision-side shared types and stable utility definitions
 - `cvkit::media`
-  - media backend selection and frame input
+  - media backend selection, frame input, video metadata, and runtime capability probing
 - `cvkit::image`
   - image operations used by the inference path
 - `cvkit::infer`
@@ -67,6 +69,7 @@ Current first-stage inference scope:
 - implemented backends:
   - onnxruntime
   - tensorrt
+
 ## Build Options
 
 Core local options:
@@ -116,6 +119,36 @@ Conventions:
 
 - labels file format: UTF-8 text, one class name per line
 - default labels: `assets/labels/coco80.txt`
+
+## Media GPU Probe
+
+Use GPU 7 to verify that the local GStreamer/NVDEC stack can decode `assets/video/test.mp4` into CUDA memory:
+
+```bash
+CUDA_DEVICE_INDEX=7 ./scripts/probe_media_gpu.sh
+```
+
+This validates `video/x-raw(memory:CUDAMemory)` output. Use `Source::read(Frame&)` for host frames and `Source::read(DeviceFrame&)` for CUDA device frames.
+
+Use the same device for an end-to-end GPU video detection smoke when the build has `CVKIT_ENABLE_TENSORRT=ON`:
+
+```bash
+CUDA_DEVICE_INDEX=7 ./scripts/probe_video_gpu_detection.sh
+```
+
+This validates `DeviceFrame` NV12 input through YOLO CUDA preprocess, TensorRT inference, and host postprocess. It does not download frames for drawing or video writing.
+The script uses `CUDA_VISIBLE_DEVICES=$CUDA_DEVICE_INDEX`, so the process-local CUDA device passed to the example defaults to `0`. Override `PROCESS_CUDA_DEVICE_INDEX` only when you intentionally expose multiple CUDA devices to the process.
+
+To explicitly download one decoded NV12 frame for visual inspection and write an annotated image:
+
+```bash
+CUDA_DEVICE_INDEX=7 \
+OUTPUT_IMAGE_PATH=/workspace/cvkit/assets/output/video_gpu_detection_frame0.jpg \
+./scripts/probe_video_gpu_detection.sh
+```
+
+This is an opt-in debug/export path, not an implicit fallback in the GPU pipeline.
+
 - default model path: `assets/models/yolo11n.onnx`
 - generated example outputs go to `assets/output/`
 
@@ -535,7 +568,8 @@ Execution and graph tracing:
 - `--dump-graph-json`
   - writes the same graph metadata and latest trace to a JSON file
   - useful for scripting, visualization, and offline DAG inspection
-  - current schema version: `5`
+  - current schema version: `6`
+  - tiled runs include structured top-level `tiling` metadata and per-trace `tile_info` entries
 - `CVKIT_EXECUTOR_THREADS`
   - controls the shared internal executor thread-pool size
 - `CVKIT_TRACE_GRAPH=1`
@@ -776,7 +810,7 @@ Behavior:
   - runs an image pipeline smoke test if the required assets are present
 - `cvkit_package.sh`
   - runs `conan create` for `cvkit`
-  - builds and runs `test_package`, which validates packaged public headers, component targets, the aggregate `cvkit::cvkit` target, task schemas, and `TileOptions` without requiring model assets
+  - builds and runs `test_package`, which validates packaged public headers, component targets, the aggregate `cvkit::cvkit` target, task schemas, `TileOptions`, and tiled trace metadata without requiring model assets
   - skips gracefully if required system OpenCV or ONNX Runtime packages are not detected
 - `all.sh`
   - runs both scripts in sequence

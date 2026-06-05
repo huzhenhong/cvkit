@@ -4,6 +4,7 @@
 
 架构细节：
 
+- `docs/STATUS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_STYLE.md`
 
@@ -21,6 +22,7 @@ app
 - 基于 ONNX Runtime 和 TensorRT 的 YOLO11 detection
 - 具备 encoder / decoder 分离能力的 EfficientSAM 风格 promptable segmentation
 - 可切换后端的图像/视频输入
+- 面向后续设备帧链路的 GStreamer/NVDEC 能力探测
 - graph-aware 的异步执行、tracing 和 JSON 导出
 - 保持领域 API 与第三方实现之间的边界清晰
 
@@ -29,7 +31,7 @@ app
 - `cvkit::core`
   - 视觉侧共享类型与稳定基础定义
 - `cvkit::media`
-  - 媒体后端选择与帧输入
+  - 媒体后端选择、帧输入、视频元数据与运行时能力探测
 - `cvkit::image`
   - 推理流程所需的图像处理
 - `cvkit::infer`
@@ -67,6 +69,7 @@ app
 - 已实现 backend：
   - onnxruntime
   - tensorrt
+
 ## 构建开关
 
 本地目标开关：
@@ -116,6 +119,36 @@ app
 
 - 标签文件格式：UTF-8 文本，一行一个类别
 - 默认标签文件：`assets/labels/coco80.txt`
+
+## Media GPU Probe
+
+使用第 7 张 GPU 验证本机 GStreamer/NVDEC 能否把 `assets/video/test.mp4` 解码到 CUDA memory：
+
+```bash
+CUDA_DEVICE_INDEX=7 ./scripts/probe_media_gpu.sh
+```
+
+这一步验证 `video/x-raw(memory:CUDAMemory)` 输出。`Source::read(Frame&)` 用于 host frame，`Source::read(DeviceFrame&)` 用于 CUDA device frame。
+
+当构建打开 `CVKIT_ENABLE_TENSORRT=ON` 时，可以用同一张卡验证端到端 GPU 视频检测 smoke：
+
+```bash
+CUDA_DEVICE_INDEX=7 ./scripts/probe_video_gpu_detection.sh
+```
+
+这一步验证 `DeviceFrame` NV12 输入经过 YOLO CUDA preprocess、TensorRT inference 和 host postprocess。它不会为了绘制或写视频而下载整帧。
+脚本会设置 `CUDA_VISIBLE_DEVICES=$CUDA_DEVICE_INDEX`，因此传给 example 的进程内 CUDA device 默认是 `0`。只有在进程内主动暴露多张卡时，才需要覆盖 `PROCESS_CUDA_DEVICE_INDEX`。
+
+如果需要显式下载一帧做可视化检查并写出带框图片：
+
+```bash
+CUDA_DEVICE_INDEX=7 \
+OUTPUT_IMAGE_PATH=/workspace/cvkit/assets/output/video_gpu_detection_frame0.jpg \
+./scripts/probe_video_gpu_detection.sh
+```
+
+这是 opt-in 的调试/导出路径，不是 GPU pipeline 里的隐式 fallback。
+
 - 默认模型路径：`assets/models/yolo11n.onnx`
 - example 生成的输出默认写到 `assets/output/`
 
@@ -535,7 +568,8 @@ TensorRT cache 规则：
 - `--dump-graph-json`
   - 将同一份图 metadata 和最近一次 trace 写到 JSON 文件
   - 适合脚本消费、可视化，以及离线查看 DAG 结构
-  - 当前 schema version：`5`
+  - 当前 schema version：`6`
+  - tiled 运行会额外包含结构化的顶层 `tiling` metadata 和逐 trace 的 `tile_info`
 - `CVKIT_EXECUTOR_THREADS`
   - 控制内部共享 executor 线程池大小
 - `CVKIT_TRACE_GRAPH=1`
@@ -776,7 +810,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
   - 如果资源齐全，再运行一次图片 pipeline smoke test
 - `cvkit_package.sh`
   - 对 `cvkit` 执行 `conan create`
-  - 构建并运行 `test_package`，验证 package 态 public headers、component targets、聚合 `cvkit::cvkit` target、task schemas 和 `TileOptions`，不依赖模型资源
+  - 构建并运行 `test_package`，验证 package 态 public headers、component targets、聚合 `cvkit::cvkit` target、task schemas、`TileOptions` 和 tiled trace metadata，不依赖模型资源
   - 如果没有检测到系统 OpenCV 或 ONNX Runtime，会优雅跳过
 - `all.sh`
   - 顺序执行上述两条脚本

@@ -47,7 +47,8 @@ namespace cvkit::infer::detail
 
         [[nodiscard]] bool   ok() const
         {
-            return status == YoloPreprocessStatus::ok && !result.tensor.data.empty();
+            return status == YoloPreprocessStatus::ok &&
+                   (result.tensor.has_valid_host_layout() || result.tensor.has_valid_device_view());
         }
     };
 

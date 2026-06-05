@@ -190,7 +190,7 @@ namespace cvkit::infer::detail
         const Packet&          packet,
         const PipelineContext& context)
     {
-        const auto* frame      = find_host_frame_input(packet.input);
+        const auto* frame      = find_image_frame_input(packet.input);
         const auto* preprocess = packet.get<LetterboxResult>("detection.preprocess");
         const auto* outputs    = packet.get<RawTensorMap>("detection.raw_outputs");
         if (frame == nullptr || preprocess == nullptr || outputs == nullptr)

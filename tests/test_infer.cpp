@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <future>
 #include <iterator>
+#include <memory>
 
 #if defined(CVKIT_WITH_CUDA_RUNTIME)
     #include <cuda_runtime_api.h>
@@ -1319,6 +1320,57 @@ TEST_CASE("yolo preprocess source selection distinguishes host and cuda image in
     CHECK(cuda_source.image != nullptr);
     CHECK(cuda_source.memory_device == cvkit::infer::MemoryDevice::cuda);
     CHECK(cuda_source.device.kind == cvkit::infer::DeviceKind::cuda);
+}
+
+TEST_CASE("yolo cuda preprocess accepts nv12 device frame input")
+{
+#if !defined(CVKIT_WITH_CUDA_RUNTIME) || !defined(CVKIT_WITH_CUDA_PREPROCESS_KERNEL)
+    SKIP("CUDA runtime and preprocess kernel are required for NV12 device-frame preprocess");
+#else
+    const int width = 64;
+    const int height = 48;
+    const auto stride = static_cast<std::size_t>(width);
+    const auto bytes = stride * static_cast<std::size_t>(height) * 3U / 2U;
+
+    void* device_ptr = nullptr;
+    REQUIRE(cudaMalloc(&device_ptr, bytes) == cudaSuccess);
+    REQUIRE(cudaMemset(device_ptr, 128, bytes) == cudaSuccess);
+
+    cvkit::core::DeviceFrame device_frame{};
+    device_frame.desc.width = width;
+    device_frame.desc.height = height;
+    device_frame.desc.channels = 1;
+    device_frame.desc.format = cvkit::core::PixelFormat::nv12;
+    device_frame.data = reinterpret_cast<std::uintptr_t>(device_ptr);
+    device_frame.bytes = bytes;
+    device_frame.stride_bytes = stride;
+    device_frame.memory_device = cvkit::core::MemoryDevice::cuda;
+    device_frame.device_index = 0;
+    device_frame.owner = std::shared_ptr<void>(
+        device_ptr,
+        [](void* ptr)
+        {
+            if (ptr != nullptr)
+            {
+                cudaFree(ptr);
+            }
+        });
+    REQUIRE(device_frame.valid());
+
+    const auto image = cvkit::infer::image_value_from_device_frame(device_frame);
+    REQUIRE(image.has_valid_device_view());
+    CHECK(image.storage_owner == device_frame.owner);
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", image);
+
+    const auto outcome = cvkit::infer::detail::preprocess_yolo(input, {1, 3, 32, 32}, true);
+    REQUIRE(outcome.ok());
+    CHECK(outcome.result.tensor.memory_device == cvkit::infer::MemoryDevice::cuda);
+    CHECK(outcome.result.tensor.storage == cvkit::infer::StorageKind::owned);
+    CHECK(outcome.result.tensor.shape == std::vector<std::int64_t>{1, 3, 32, 32});
+    CHECK(outcome.result.tensor.has_valid_device_view());
+#endif
 }
 
 TEST_CASE("backend output tensor contract currently supports float32 export only")

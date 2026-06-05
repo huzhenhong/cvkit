@@ -40,6 +40,17 @@ int main()
     frame.desc.format   = cvkit::core::PixelFormat::bgr8;
     frame.data.assign(static_cast<std::size_t>(4 * 4 * 3), 7U);
 
+    cvkit::core::DeviceFrame device_frame{};
+    device_frame.desc.width    = 4;
+    device_frame.desc.height   = 4;
+    device_frame.desc.channels = 1;
+    device_frame.desc.format   = cvkit::core::PixelFormat::nv12;
+    device_frame.memory_device = cvkit::core::MemoryDevice::cuda;
+    if (!require(!device_frame.valid()))
+    {
+        return 1;
+    }
+
     const auto resized = cvkit::image::resize(frame, 2, 2);
     if (!require(resized.desc.width == 2 && resized.desc.height == 2))
     {
@@ -72,6 +83,20 @@ int main()
                  stored_tile_options.tile_height == 640 &&
                  stored_tile_options.overlap_x == 160 &&
                  stored_tile_options.overlap_y == 160))
+    {
+        return 1;
+    }
+
+    cvkit::infer::GraphTraceInfo trace_info{};
+    trace_info.name                 = "tile_0";
+    trace_info.has_tile_info        = true;
+    trace_info.tile_info.tile_index = 0;
+    trace_info.tile_info.width      = 640;
+    trace_info.tile_info.height     = 640;
+    if (!require(trace_info.has_tile_info &&
+                 trace_info.tile_info.tile_index == 0 &&
+                 trace_info.tile_info.width == 640 &&
+                 trace_info.tile_info.height == 640))
     {
         return 1;
     }
@@ -121,6 +146,19 @@ int main()
 
     cvkit::media::Source source;
     if (!require(!source.open(std::string{})))
+    {
+        return 1;
+    }
+    if (!require(!source.is_open() &&
+                 source.status() == cvkit::media::SourceStatus::invalid_uri &&
+                 !source.status_message().empty() &&
+                 !source.info().open))
+    {
+        return 1;
+    }
+
+    const auto media_capabilities = cvkit::media::runtime_capabilities(7);
+    if (!require(!media_capabilities.gstreamer || media_capabilities.gstreamer_appsink))
     {
         return 1;
     }

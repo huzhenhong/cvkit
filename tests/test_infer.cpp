@@ -9,6 +9,7 @@
 #include "../src/infer/tasks/facemesh/facemesh_pipeline.h"
 #include "../src/infer/tasks/pose/pose_pipeline.h"
 #include "../src/infer/tasks/segmentation/segmentation_pipeline.h"
+#include "cvkit/infer/debug.h"
 #include "cvkit/infer/model.h"
 #include "cvkit/infer/tensor_io.h"
 
@@ -593,6 +594,57 @@ namespace
         std::string name_{};
     };
 
+    void check_face_tiled_trace(const std::vector<cvkit::infer::GraphTraceInfo>& trace)
+    {
+        REQUIRE(trace.size() == 13);
+        CHECK(trace.front().name == "tiled_inference");
+        CHECK(trace.front().sequence == 0);
+        CHECK(trace.front().scratch_count == 12);
+        CHECK(trace.front().message.find("tiles=12") != std::string::npos);
+        CHECK(trace.front().message.find("source=2048x1150") != std::string::npos);
+        CHECK(trace.front().message.find("tile=640x640") != std::string::npos);
+        REQUIRE(trace.front().has_tile_info);
+        CHECK(trace.front().tile_info.aggregate);
+        CHECK(trace.front().tile_info.tile_count == 12);
+        CHECK(trace.front().tile_info.source_width == 2048);
+        CHECK(trace.front().tile_info.source_height == 1150);
+        CHECK(trace.front().tile_info.tile_width == 640);
+        CHECK(trace.front().tile_info.tile_height == 640);
+        CHECK(trace.front().tile_info.overlap_x == 160);
+        CHECK(trace.front().tile_info.overlap_y == 160);
+        CHECK(trace[1].name == "tile_0");
+        CHECK(trace[1].message.find("x=0 y=0 width=640 height=640") != std::string::npos);
+        REQUIRE(trace[1].has_tile_info);
+        CHECK_FALSE(trace[1].tile_info.aggregate);
+        CHECK(trace[1].tile_info.tile_index == 0);
+        CHECK(trace[1].tile_info.x == 0);
+        CHECK(trace[1].tile_info.y == 0);
+        CHECK(trace[1].tile_info.width == 640);
+        CHECK(trace[1].tile_info.height == 640);
+        CHECK(trace.back().name == "tile_11");
+        CHECK(trace.back().message.find("tile_index=11") != std::string::npos);
+        REQUIRE(trace.back().has_tile_info);
+        CHECK(trace.back().tile_info.tile_index == 11);
+        CHECK(trace.back().tile_info.x == 1408);
+        CHECK(trace.back().tile_info.y == 510);
+        CHECK(trace.back().tile_info.width == 640);
+        CHECK(trace.back().tile_info.height == 640);
+    }
+
+    void check_face_tiled_json(const cvkit::infer::Model& model, bool async_infer)
+    {
+        const auto json = cvkit::infer::build_graph_json(model, async_infer);
+        CHECK(json.find("\"tiling\": {") != std::string::npos);
+        CHECK(json.find("\"tile_count\": 12") != std::string::npos);
+        CHECK(json.find("\"source_width\": 2048") != std::string::npos);
+        CHECK(json.find("\"source_height\": 1150") != std::string::npos);
+        CHECK(json.find("\"tile_width\": 640") != std::string::npos);
+        CHECK(json.find("\"overlap_x\": 160") != std::string::npos);
+        CHECK(json.find("\"tile_index\": 11") != std::string::npos);
+        CHECK(json.find("\"tile_info\": {\"aggregate\":true") != std::string::npos);
+        CHECK(json.find("\"tile_info\": {\"aggregate\":false") != std::string::npos);
+    }
+
 }  // namespace
 
 TEST_CASE("model load fails for missing onnx file")
@@ -1076,6 +1128,71 @@ TEST_CASE("face detection tiled model merges detections back to source coordinat
                    detection.box.x <= static_cast<float>(frame.desc.width) &&
                    detection.box.y <= static_cast<float>(frame.desc.height);
         }));
+
+    const auto trace = model.last_graph_trace();
+    check_face_tiled_trace(trace);
+    check_face_tiled_json(model, false);
+}
+
+TEST_CASE("face detection tiled async model stores tile trace")
+{
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto model_path  = source_root / "assets" / "models" / "scrfd_10g_ac133ba7.onnx";
+    const auto image_path  = source_root / "assets" / "images" / "face.jpg";
+
+    if (!std::filesystem::exists(model_path) || !std::filesystem::exists(image_path))
+    {
+        SKIP("scrfd_10g_ac133ba7.onnx or face.jpg is not present under assets");
+    }
+
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path = model_path.string();
+    spec.backend    = cvkit::infer::Backend::onnxruntime;
+    spec.task       = cvkit::infer::TaskKind::face_detection;
+    spec.family     = "scrfd_raw_bgr";
+
+    cvkit::infer::Model model;
+    model.set_confidence_threshold(0.5F);
+    model.set_iou_threshold(0.4F);
+    if (!model.load(spec))
+    {
+        SKIP("onnxruntime face detection backend is not available in this build");
+    }
+
+    const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
+    REQUIRE_FALSE(image.empty());
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
+    frame.desc.channels = image.channels();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
+    frame.data.assign(image.data, image.data + image.total() * image.elemSize());
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", frame);
+
+    cvkit::infer::TileOptions tile_options{};
+    tile_options.enabled     = true;
+    tile_options.tile_width  = 640;
+    tile_options.tile_height = 640;
+    tile_options.overlap_x   = 160;
+    tile_options.overlap_y   = 160;
+    model.set_tile_options(tile_options);
+
+    auto future = model.submit(input);
+    REQUIRE(future.valid());
+    CHECK(future.wait_for(std::chrono::seconds(10)) == std::future_status::ready);
+
+    const auto  output     = future.get();
+    const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(detections != nullptr);
+    CHECK(detections->size() > 500U);
+
+    const auto trace = model.last_graph_trace();
+    check_face_tiled_trace(trace);
+    check_face_tiled_json(model, true);
 }
 
 TEST_CASE("pose pipeline returns keypoints and scores")
@@ -2219,6 +2336,76 @@ TEST_CASE("tensorrt backend loads yolo11 model and returns detections for sample
 
     const auto detections = model.run_detection(frame);
     CHECK_FALSE(detections.empty());
+}
+
+TEST_CASE("tensorrt face detection supports scrfd raw-bgr tiled public api")
+{
+    if (std::getenv("CVKIT_RUN_TENSORRT_SMOKE") == nullptr)
+    {
+        SKIP("set CVKIT_RUN_TENSORRT_SMOKE=1 to enable the TensorRT SCRFD tiled smoke test");
+    }
+
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto model_path  = source_root / "assets" / "models" / "scrfd_10g_ac133ba7.onnx";
+    const auto image_path  = source_root / "assets" / "images" / "face.jpg";
+
+    REQUIRE(std::filesystem::exists(model_path));
+    REQUIRE(std::filesystem::exists(image_path));
+
+    cvkit::infer::ModelSpec spec{};
+    spec.model_path = model_path.string();
+    spec.backend    = cvkit::infer::Backend::tensorrt;
+    spec.task       = cvkit::infer::TaskKind::face_detection;
+    spec.family     = "scrfd_raw_bgr";
+
+    cvkit::infer::Model model;
+    model.set_confidence_threshold(0.5F);
+    model.set_iou_threshold(0.4F);
+    REQUIRE(model.load(spec));
+    REQUIRE(model.loaded());
+    REQUIRE(model.backend() == cvkit::infer::Backend::tensorrt);
+
+    const auto image = cv::imread(image_path.string(), cv::IMREAD_COLOR);
+    REQUIRE_FALSE(image.empty());
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = image.cols;
+    frame.desc.height   = image.rows;
+    frame.desc.channels = image.channels();
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.source        = image_path.string();
+    frame.data.assign(image.data, image.data + image.total() * image.elemSize());
+
+    cvkit::infer::TaskInput input{};
+    input.add("image", frame);
+
+    cvkit::infer::TileOptions tile_options{};
+    tile_options.enabled     = true;
+    tile_options.tile_width  = 640;
+    tile_options.tile_height = 640;
+    tile_options.overlap_x   = 160;
+    tile_options.overlap_y   = 160;
+    model.set_tile_options(tile_options);
+
+    const auto  output     = model.run_sync(input);
+    const auto* detections = output.find<std::vector<cvkit::core::Detection>>("detections");
+    REQUIRE(detections != nullptr);
+    CHECK(detections->size() > 500U);
+    CHECK(std::all_of(
+        detections->begin(),
+        detections->end(),
+        [&frame](const cvkit::core::Detection& detection)
+        {
+            return detection.box.x >= 0.0F &&
+                   detection.box.y >= 0.0F &&
+                   detection.box.x <= static_cast<float>(frame.desc.width) &&
+                   detection.box.y <= static_cast<float>(frame.desc.height);
+        }));
+    CHECK(std::any_of(
+        detections->begin(),
+        detections->end(),
+        [](const cvkit::core::Detection& detection)
+        { return detection.keypoints.size() == 5; }));
 }
 
 TEST_CASE("tensorrt detection public api covers sync async cuda input and preferred device outputs")

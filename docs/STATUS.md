@@ -70,6 +70,7 @@ Model/runtime smoke coverage:
   - device convention: physical GPU is selected with `CUDA_VISIBLE_DEVICES`; process-local CUDA device defaults to `0`
   - explicit debug export: `OUTPUT_IMAGE_PATH=/workspace/cvkit/assets/output/video_gpu_detection_frame0.jpg`
   - export sample: `assets/output/video_gpu_detection_frame0.jpg`, `2560x1440`, JPEG
+- GStreamer/NVDEC CUDA NV12 `DeviceFrame` now feeds promptable encoder CUDA preprocess in `cvkit_test_media_infer`
 - SCRFD tiled TensorRT example on GPU 7:
   - `faces=657`
   - `keypoints=3285`
@@ -130,7 +131,7 @@ Highest-value next steps:
   - use `scripts/probe_media_gpu.sh` to validate NVDEC on the selected CUDA device
   - use `scripts/probe_video_gpu_detection.sh` to validate NVDEC `DeviceFrame` through TensorRT YOLO detection
   - keep `Source::read(Frame&)` host-only and use `Source::read(DeviceFrame&)` for CUDAMemory output
-  - keep CUDAMemory NV12 device frames wired into YOLO CUDA preprocess
+  - keep CUDAMemory NV12 device frames wired into YOLO and promptable encoder CUDA preprocess
   - keep visual export opt-in; do not add implicit full-frame downloads to the GPU path
   - keep TensorRT media-to-infer smoke gated because it requires a real GPU runtime and engine build
 - Keep infer follow-up bounded:

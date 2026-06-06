@@ -272,9 +272,9 @@ Near-term media work should focus on:
 - basic writer API symmetry with reader options beyond the current host-writer paths
 - video-file EOF, timestamp, fps, and frame-index coverage
 - optional GStreamer/CUDA decode path design without forcing it into the infer graph
-- keep `DeviceFrame` NV12 output wired through YOLO CUDA preprocess and TensorRT smoke coverage
+- keep `DeviceFrame` NV12 output wired through YOLO and promptable encoder CUDA preprocess coverage
 - keep avoiding implicit `cudadownload`; host fallback must remain explicit
-- current first CUDA media-to-infer bridge supports NV12 `DeviceFrame` input through YOLO CUDA preprocess, TensorRT input, and host postprocess
+- current CUDA media-to-infer bridge supports NV12 `DeviceFrame` input through YOLO CUDA preprocess and promptable encoder CUDA preprocess; TensorRT YOLO smoke remains the model-level GPU validation path
 - GPU smoke scripts select the physical GPU through `CUDA_VISIBLE_DEVICES`; process-local device indices should normally remain `0`
 - annotated image export for the GPU video example is an explicit debug/export path that downloads one selected NV12 frame
 

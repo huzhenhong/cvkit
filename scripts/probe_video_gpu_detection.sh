@@ -17,6 +17,7 @@ DUMP_FRAME_INDEX="${DUMP_FRAME_INDEX:-0}"
 if [[ ! -x "${EXAMPLE_BIN}" ]]; then
     echo "example binary not found or not executable: ${EXAMPLE_BIN}" >&2
     echo "build it with CVKIT_ENABLE_TENSORRT=ON and CVKIT_BUILD_EXAMPLES=ON" >&2
+    echo "the GPU video detection example is intentionally not built when TensorRT is disabled" >&2
     exit 1
 fi
 

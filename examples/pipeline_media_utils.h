@@ -24,14 +24,4 @@ namespace cvkit::examples
         cv::Mat&                     first_frame,
         double&                      fps);
 
-    [[nodiscard]] bool open_video_writer(
-        const std::filesystem::path& video_path,
-        const std::filesystem::path& output_dir,
-        cvkit::media::WriterBackend  writer_backend,
-        cvkit::media::GstVideoCodec  gst_codec,
-        double                       fps,
-        const cv::Size&              frame_size,
-        cv::VideoWriter&             writer,
-        std::filesystem::path&       output_path);
-
 }  // namespace cvkit::examples

@@ -29,6 +29,7 @@ Implemented execution/runtime pieces:
 - tensor file I/O for EfficientSAM encoder/decoder exchange
 - model-level tiled inference through `TileOptions`
 - package-mode public API smoke coverage through `test_package`
+- media `Writer` API first pass for host BGR frames through OpenCV
 
 ## Validated Flows
 
@@ -55,6 +56,8 @@ Model/runtime smoke coverage:
 - SCRFD face detection ONNX
 - SCRFD tiled face detection on `assets/images/face.jpg`
 - OpenCV media `Source` image read and EOF/status behavior
+- OpenCV media `Writer` host BGR video write/readback behavior
+- Pipeline video example now writes through `cvkit::media::Writer` instead of example-local `cv::VideoWriter` glue
 - YOLO11 TensorRT example on GPU 7:
   - `detections=2`
   - graph JSON exported to `assets/output/trt_yolo_graph.json`
@@ -102,6 +105,7 @@ Important limitations:
 - TensorRT smoke tests are opt-in where real GPU/runtime coverage is required.
 - Non-float32 execution is not generally supported even though metadata can describe richer dtypes.
 - OpenVINO and FFmpeg backend paths are reserved, not implemented.
+- Media `Writer` currently supports host BGR frames only; device-frame writing and GPU encode are explicit non-goals for the first writer pass.
 
 ## Next Recommended Work
 
@@ -111,6 +115,7 @@ Highest-value next steps:
   - extend inspectable status beyond the current basic open/eof/error states where practical
   - keep media source lifetime outside the infer task graph
   - keep GStreamer optional and backend-gated
+  - keep writer API symmetric but avoid pretending GStreamer/FFmpeg/GPU encode are ready before implementation
 - Add deeper host-first media coverage:
   - keep OpenCV image/video reader tests aligned with workspace assets
   - keep timestamp/fps/source/frame-index metadata coverage

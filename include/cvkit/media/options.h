@@ -47,8 +47,12 @@ namespace cvkit::media
 
     struct BK_MEDIA_EXPORT WriterOptions
     {
+        std::string   uri{};
         WriterBackend backend{WriterBackend::opencv};
         GstVideoCodec gst_codec{GstVideoCodec::jpegavi};
+        int           width{0};
+        int           height{0};
+        double        fps{25.0};
         std::size_t   max_frames{0};
     };
 

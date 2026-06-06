@@ -31,7 +31,7 @@ Current focus:
 - `cvkit::core`
   - vision-side shared types and stable utility definitions
 - `cvkit::media`
-  - media backend selection, frame input, video metadata, and runtime capability probing
+  - media backend selection, frame input/output, video metadata, and runtime capability probing
 - `cvkit::image`
   - image operations used by the inference path
 - `cvkit::infer`

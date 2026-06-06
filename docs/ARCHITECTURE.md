@@ -232,6 +232,7 @@ Current public media API:
 - `cvkit::media::Source`
 - `cvkit::media::SourceOptions`
 - `cvkit::media::ReaderBackend`
+- `cvkit::media::Writer`
 - `cvkit::media::WriterOptions`
 - `cvkit::media::WriterBackend`
 
@@ -247,6 +248,15 @@ Current implemented reader behavior:
 - `Source::is_open()`, `Source::status()`, `Source::status_message()`, and `Source::info()` expose source state plus basic video metadata such as fps, frame count, and frame index
 - `cvkit::media::runtime_capabilities(cuda_device_index)` reports available GStreamer/CUDA decode elements without requiring the caller to shell out to `gst-inspect-1.0`
 
+Current implemented writer behavior:
+
+- `Writer` supports host `cvkit::core::Frame` input through OpenCV
+- the first writer path requires packed BGR8 frame data with fixed width/height/fps from `WriterOptions`
+- `Writer::write(DeviceFrame&)` rejects device frames explicitly; GPU encode is not implemented yet
+- GStreamer and FFmpeg writer backends are reserved in the public options but currently rejected by `Writer`
+- `Writer::status()`, `Writer::status_message()`, and `Writer::info()` expose open/error/limit state plus written frame count
+- the pipeline example uses `cvkit::media::Writer` for host annotated video output; GStreamer/FFmpeg writer selections fail explicitly until those backends are implemented
+
 Media is intentionally not modeled as "create one graph node per frame". The preferred direction is:
 
 - keep source lifetime outside the infer task graph
@@ -257,7 +267,7 @@ Media is intentionally not modeled as "create one graph node per frame". The pre
 Near-term media work should focus on:
 
 - deterministic EOF/error reporting instead of only `bool`
-- basic writer API symmetry with reader options
+- basic writer API symmetry with reader options beyond the current OpenCV host-writer path
 - video-file EOF, timestamp, fps, and frame-index coverage
 - optional GStreamer/CUDA decode path design without forcing it into the infer graph
 - keep `DeviceFrame` NV12 output wired through YOLO CUDA preprocess and TensorRT smoke coverage

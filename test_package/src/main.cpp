@@ -10,6 +10,7 @@
 #include "cvkit/infer/tasks/promptable_segmentation.h"
 #include "cvkit/infer/tasks/segmentation.h"
 #include "cvkit/media/source.h"
+#include "cvkit/media/writer.h"
 
 #include <cstddef>
 #include <string>
@@ -46,7 +47,18 @@ int main()
     device_frame.desc.channels = 1;
     device_frame.desc.format   = cvkit::core::PixelFormat::nv12;
     device_frame.memory_device = cvkit::core::MemoryDevice::cuda;
+    device_frame.device_index  = 0;
     if (!require(!device_frame.valid()))
+    {
+        return 1;
+    }
+
+    cvkit::infer::ImageValue device_image = cvkit::infer::image_value_from_device_frame(device_frame);
+    if (!require(device_image.memory_device == cvkit::infer::MemoryDevice::cuda &&
+                 device_image.device.kind == cvkit::infer::DeviceKind::cuda &&
+                 device_image.device.index == 0 &&
+                 device_image.frame.desc.format == cvkit::core::PixelFormat::nv12 &&
+                 !device_image.has_valid_device_view()))
     {
         return 1;
     }
@@ -159,6 +171,22 @@ int main()
 
     const auto media_capabilities = cvkit::media::runtime_capabilities(7);
     if (!require(!media_capabilities.gstreamer || media_capabilities.gstreamer_appsink))
+    {
+        return 1;
+    }
+
+    cvkit::media::WriterOptions writer_options{};
+    writer_options.uri     = {};
+    writer_options.backend = cvkit::media::WriterBackend::opencv;
+    writer_options.width   = 4;
+    writer_options.height  = 4;
+    writer_options.fps     = 25.0;
+
+    cvkit::media::Writer writer;
+    if (!require(!writer.open(writer_options) &&
+                 writer.status() == cvkit::media::WriterStatus::invalid_options &&
+                 !writer.status_message().empty() &&
+                 !writer.info().open))
     {
         return 1;
     }

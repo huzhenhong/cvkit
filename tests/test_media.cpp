@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "cvkit/media/source.h"
+#include "cvkit/media/writer.h"
 
 #include <cstddef>
 #include <filesystem>
@@ -215,4 +216,92 @@ TEST_CASE("gstreamer media source reads h264 video as cuda device frame")
     CHECK(frame.stride_bytes > 0);
     CHECK(frame.device_index == 7);
     CHECK(frame.source == video_path.string());
+}
+
+TEST_CASE("opencv media writer writes host bgr frames")
+{
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto output_dir  = source_root / "assets" / "output";
+    std::filesystem::create_directories(output_dir);
+    const auto output_path = output_dir / "test_media_writer.avi";
+    std::filesystem::remove(output_path);
+
+    cvkit::media::WriterOptions options{};
+    options.uri        = output_path.string();
+    options.backend    = cvkit::media::WriterBackend::opencv;
+    options.width      = 64;
+    options.height     = 48;
+    options.fps        = 12.0;
+    options.max_frames = 3;
+
+    cvkit::media::Writer writer;
+    REQUIRE(writer.open(std::move(options)));
+    CHECK(writer.is_open());
+    CHECK(writer.status() == cvkit::media::WriterStatus::open);
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 48;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 64U);
+
+    REQUIRE(writer.write(frame));
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 128U);
+    REQUIRE(writer.write(frame));
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 192U);
+    REQUIRE(writer.write(frame));
+    CHECK(writer.info().frame_count == 3);
+    CHECK_FALSE(writer.write(frame));
+    CHECK(writer.status() == cvkit::media::WriterStatus::limit_reached);
+    writer.close();
+    CHECK_FALSE(writer.is_open());
+
+    REQUIRE(std::filesystem::exists(output_path));
+
+    cvkit::media::Source source;
+    REQUIRE(source.open(output_path.string()));
+    cvkit::core::Frame decoded{};
+    REQUIRE(source.read(decoded));
+    CHECK(decoded.desc.width == 64);
+    CHECK(decoded.desc.height == 48);
+    CHECK(decoded.desc.channels == 3);
+    CHECK(decoded.desc.format == cvkit::core::PixelFormat::bgr8);
+}
+
+TEST_CASE("media writer rejects unsupported and device-frame paths explicitly")
+{
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto output_dir  = source_root / "assets" / "output";
+    std::filesystem::create_directories(output_dir);
+    const auto output_path = output_dir / "device_writer_reject.avi";
+    std::filesystem::remove(output_path);
+
+    cvkit::media::WriterOptions options{};
+    options.uri     = output_path.string();
+    options.backend = cvkit::media::WriterBackend::gstreamer;
+    options.width   = 64;
+    options.height  = 48;
+    options.fps     = 25.0;
+
+    cvkit::media::Writer writer;
+    CHECK_FALSE(writer.open(std::move(options)));
+    CHECK(writer.status() == cvkit::media::WriterStatus::unsupported_backend);
+
+    cvkit::media::WriterOptions host_options{};
+    host_options.uri     = output_path.string();
+    host_options.backend = cvkit::media::WriterBackend::opencv;
+    host_options.width   = 64;
+    host_options.height  = 48;
+    host_options.fps     = 25.0;
+    REQUIRE(writer.open(std::move(host_options)));
+
+    cvkit::core::DeviceFrame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 48;
+    frame.desc.channels = 1;
+    frame.desc.format   = cvkit::core::PixelFormat::nv12;
+    frame.memory_device = cvkit::core::MemoryDevice::cuda;
+    CHECK_FALSE(writer.write(frame));
+    CHECK(writer.status() == cvkit::media::WriterStatus::unsupported_backend);
 }

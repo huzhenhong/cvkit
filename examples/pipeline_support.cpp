@@ -4,6 +4,7 @@
 #include "example_opencv_utils.h"
 #include "pipeline_media_utils.h"
 #include "cvkit/core/types.h"
+#include "cvkit/media/writer.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -223,10 +224,20 @@ namespace cvkit::examples
             return 1;
         }
 
-        std::filesystem::path output_path;
-        cv::VideoWriter       writer;
-        if (!open_video_writer(video_path, output_dir, writer_backend, gst_codec, fps, first_frame.size(), writer, output_path))
+        static_cast<void>(gst_codec);
+
+        const auto            output_root = ensure_output_dir(output_dir);
+        const auto            output_path = output_root / (video_path.stem().string() + "_det.avi");
+        cvkit::media::Writer  writer;
+        cvkit::media::WriterOptions writer_options{};
+        writer_options.uri     = output_path.string();
+        writer_options.backend = writer_backend;
+        writer_options.width   = first_frame.cols;
+        writer_options.height  = first_frame.rows;
+        writer_options.fps     = fps;
+        if (!writer.open(std::move(writer_options)))
         {
+            std::cerr << "failed to open video writer: " << writer.status_message() << '\n';
             return 1;
         }
 
@@ -247,7 +258,12 @@ namespace cvkit::examples
             }
             total_detections += detections.size();
             draw_detections(frame, detections);
-            writer.write(frame);
+            const auto output_frame = mat_to_frame(frame, video_path.string());
+            if (!writer.write(output_frame))
+            {
+                std::cerr << "failed to write video frame: " << writer.status_message() << '\n';
+                return 1;
+            }
             ++frame_index;
             if (max_frames > 0 && frame_index >= max_frames)
             {

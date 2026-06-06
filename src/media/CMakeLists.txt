@@ -2,6 +2,7 @@ include(GenerateExportHeader)
 
 add_library(cvkit_media
     source.cpp
+    writer.cpp
 )
 
 add_library(cvkit::media ALIAS cvkit_media)
@@ -54,6 +55,7 @@ install(
 )
 install(FILES
     ${PROJECT_SOURCE_DIR}/include/cvkit/media/source.h
+    ${PROJECT_SOURCE_DIR}/include/cvkit/media/writer.h
     ${PROJECT_SOURCE_DIR}/include/cvkit/media/options.h
     ${CMAKE_CURRENT_BINARY_DIR}/generated/cvkit/media/media_export.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cvkit/media

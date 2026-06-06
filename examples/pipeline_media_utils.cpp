@@ -39,30 +39,6 @@ namespace cvkit::examples
             return "filesrc location=\"" + escape_path_for_gstreamer(path) + "\" ! decodebin ! videoconvert ! appsink sync=false";
         }
 
-        [[nodiscard]] std::string gstreamer_writer_pipeline(
-            const std::filesystem::path& path,
-            cvkit::media::GstVideoCodec  codec)
-        {
-            const auto location = escape_path_for_gstreamer(path);
-
-            if (codec == cvkit::media::GstVideoCodec::x264mp4)
-            {
-                return "appsrc ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            if (codec == cvkit::media::GstVideoCodec::nvh264)
-            {
-                return "appsrc ! videoconvert ! nvh264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            if (codec == cvkit::media::GstVideoCodec::nvv4l2h264)
-            {
-                return "appsrc ! videoconvert ! nvv4l2h264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
-            }
-
-            return "appsrc ! videoconvert ! jpegenc ! avimux ! filesink location=\"" + location + "\"";
-        }
-
     }  // namespace
 
     std::filesystem::path ensure_output_dir(const std::filesystem::path& output_dir)
@@ -151,64 +127,6 @@ namespace cvkit::examples
         }
 
         fps = std::max(1.0, capture.get(cv::CAP_PROP_FPS));
-        return true;
-    }
-
-    bool open_video_writer(
-        const std::filesystem::path& video_path,
-        const std::filesystem::path& output_dir,
-        cvkit::media::WriterBackend  writer_backend,
-        cvkit::media::GstVideoCodec  gst_codec,
-        double                       fps,
-        const cv::Size&              frame_size,
-        cv::VideoWriter&             writer,
-        std::filesystem::path&       output_path)
-    {
-        if (writer_backend == cvkit::media::WriterBackend::ffmpeg)
-        {
-            std::cerr << "writer backend not implemented yet: ffmpeg\n";
-            return false;
-        }
-
-        const auto output_root = ensure_output_dir(output_dir);
-        output_path            = output_root / (video_path.stem().string() + "_det.mp4");
-
-        if (writer_backend == cvkit::media::WriterBackend::gstreamer)
-        {
-            const bool mp4 = gst_codec == cvkit::media::GstVideoCodec::x264mp4 || gst_codec == cvkit::media::GstVideoCodec::nvh264 || gst_codec == cvkit::media::GstVideoCodec::nvv4l2h264;
-            output_path    = output_root / (video_path.stem().string() + (mp4 ? "_det.mp4" : "_det.avi"));
-            writer.open(
-                gstreamer_writer_pipeline(output_path, gst_codec),
-                cv::CAP_GSTREAMER,
-                0,
-                fps,
-                frame_size,
-                true);
-        }
-        else
-        {
-            writer.open(
-                output_path.string(),
-                cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
-                fps,
-                frame_size);
-            if (!writer.isOpened())
-            {
-                output_path = output_root / (video_path.stem().string() + "_det.avi");
-                writer.open(
-                    output_path.string(),
-                    cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
-                    fps,
-                    frame_size);
-            }
-        }
-
-        if (!writer.isOpened())
-        {
-            std::cerr << "failed to open video writer: " << output_path << '\n';
-            return false;
-        }
-
         return true;
     }
 

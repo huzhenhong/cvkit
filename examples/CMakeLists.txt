@@ -52,7 +52,6 @@ target_link_libraries(cvkit_example_pipeline
         opencv_core
         opencv_imgproc
         opencv_imgcodecs
-        opencv_videoio
 )
 
 target_link_libraries(cvkit_example_promptable_segmentation

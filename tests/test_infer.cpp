@@ -8,6 +8,7 @@
 #include "../src/infer/tasks/face_detection/face_detection_pipeline.h"
 #include "../src/infer/tasks/facemesh/facemesh_pipeline.h"
 #include "../src/infer/tasks/pose/pose_pipeline.h"
+#include "../src/infer/tasks/promptable_segmentation/promptable_preprocess_cuda.h"
 #include "../src/infer/tasks/segmentation/segmentation_pipeline.h"
 #include "cvkit/infer/debug.h"
 #include "cvkit/infer/model.h"
@@ -803,6 +804,33 @@ TEST_CASE("task input and output support richer infer value types")
     CHECK(padded_image.has_valid_host_layout());
     CHECK_FALSE(image->has_valid_device_view());
 
+    cvkit::infer::ImageValue nv12_image{};
+    nv12_image.frame.desc.width    = 8;
+    nv12_image.frame.desc.height   = 4;
+    nv12_image.frame.desc.channels = 1;
+    nv12_image.frame.desc.format   = cvkit::core::PixelFormat::nv12;
+    nv12_image.row_stride_bytes    = 8;
+    nv12_image.frame.data.assign(8U * 4U * 3U / 2U, static_cast<std::uint8_t>(128));
+    CHECK(nv12_image.bytes_per_pixel() == 1);
+    CHECK(nv12_image.packed_row_stride_bytes() == 8);
+    CHECK(nv12_image.required_byte_size() == 48);
+    CHECK(nv12_image.has_valid_host_layout());
+
+    auto short_nv12 = nv12_image;
+    short_nv12.frame.data.resize(8U * 4U);
+    CHECK_FALSE(short_nv12.has_valid_host_layout());
+
+    cvkit::infer::ImageValue cuda_nv12 = nv12_image;
+    cuda_nv12.memory_device            = cvkit::infer::MemoryDevice::cuda;
+    cuda_nv12.device                   = cvkit::infer::DeviceRef{cvkit::infer::DeviceKind::cuda, 0};
+    cuda_nv12.storage                  = cvkit::infer::StorageKind::external_view;
+    cuda_nv12.external_data            = reinterpret_cast<const void*>(0x1);
+    cuda_nv12.storage_bytes            = nv12_image.required_byte_size();
+    cuda_nv12.frame.data.clear();
+    CHECK(cuda_nv12.has_valid_device_view());
+    cuda_nv12.storage_bytes = 8U * 4U;
+    CHECK_FALSE(cuda_nv12.has_valid_device_view());
+
     REQUIRE(boxes->boxes.size() == 1);
     REQUIRE(keypoints->points.size() == 1);
 
@@ -1370,6 +1398,53 @@ TEST_CASE("yolo cuda preprocess accepts nv12 device frame input")
     CHECK(outcome.result.tensor.storage == cvkit::infer::StorageKind::owned);
     CHECK(outcome.result.tensor.shape == std::vector<std::int64_t>{1, 3, 32, 32});
     CHECK(outcome.result.tensor.has_valid_device_view());
+#endif
+}
+
+TEST_CASE("promptable cuda preprocess accepts nv12 device image")
+{
+#if !defined(CVKIT_WITH_CUDA_RUNTIME) || !defined(CVKIT_WITH_CUDA_PREPROCESS_KERNEL)
+    SKIP("CUDA runtime and preprocess kernel are required for NV12 promptable preprocess");
+#else
+    const int width = 64;
+    const int height = 48;
+    const auto stride = static_cast<std::size_t>(width);
+    const auto bytes = stride * static_cast<std::size_t>(height) * 3U / 2U;
+
+    void* device_ptr = nullptr;
+    REQUIRE(cudaMalloc(&device_ptr, bytes) == cudaSuccess);
+    REQUIRE(cudaMemset(device_ptr, 128, bytes) == cudaSuccess);
+
+    cvkit::infer::ImageValue image{};
+    image.frame.desc.width    = width;
+    image.frame.desc.height   = height;
+    image.frame.desc.channels = 1;
+    image.frame.desc.format   = cvkit::core::PixelFormat::nv12;
+    image.memory_device       = cvkit::infer::MemoryDevice::cuda;
+    image.device              = cvkit::infer::DeviceRef{cvkit::infer::DeviceKind::cuda, 0};
+    image.storage             = cvkit::infer::StorageKind::external_view;
+    image.row_stride_bytes    = stride;
+    image.external_data       = device_ptr;
+    image.storage_bytes       = bytes;
+    image.storage_owner       = std::shared_ptr<void>(
+        device_ptr,
+        [](void* ptr)
+        {
+            if (ptr != nullptr)
+            {
+                cudaFree(ptr);
+            }
+        });
+    REQUIRE(image.has_valid_device_view());
+
+    std::string error;
+    auto        tensor = cvkit::infer::detail::preprocess_promptable_encoder_cuda(image, true, &error);
+    REQUIRE(tensor.has_value());
+    CHECK(error.empty());
+    CHECK(tensor->name == "batched_images");
+    CHECK(tensor->shape == std::vector<std::int64_t>{1, 3, 1024, 1024});
+    CHECK(tensor->memory_device == cvkit::infer::MemoryDevice::cuda);
+    CHECK(tensor->has_valid_device_view());
 #endif
 }
 

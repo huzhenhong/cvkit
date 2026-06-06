@@ -89,6 +89,18 @@ namespace cvkit::infer::detail
             }
             return std::nullopt;
         }
+        const bool nv12_input = image.frame.desc.format == cvkit::core::PixelFormat::nv12;
+        if (!nv12_input &&
+            (image.frame.desc.channels != 3 ||
+             (image.frame.desc.format != cvkit::core::PixelFormat::bgr8 &&
+              image.frame.desc.format != cvkit::core::PixelFormat::rgb8)))
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "cuda promptable encoder preprocess currently requires BGR8, RGB8, or NV12 image input";
+            }
+            return std::nullopt;
+        }
 
 #if defined(CVKIT_WITH_CUDA_PREPROCESS_KERNEL)
         RawTensor tensor{};

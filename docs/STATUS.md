@@ -29,7 +29,7 @@ Implemented execution/runtime pieces:
 - tensor file I/O for EfficientSAM encoder/decoder exchange
 - model-level tiled inference through `TileOptions`
 - package-mode public API smoke coverage through `test_package`
-- media `Writer` API first pass for host BGR frames through OpenCV
+- media `Writer` API first pass for host BGR frames through OpenCV and GStreamer pipeline backends
 
 ## Validated Flows
 
@@ -57,7 +57,10 @@ Model/runtime smoke coverage:
 - SCRFD tiled face detection on `assets/images/face.jpg`
 - OpenCV media `Source` image read and EOF/status behavior
 - OpenCV media `Writer` host BGR video write/readback behavior
-- Pipeline video example now writes through `cvkit::media::Writer` instead of example-local `cv::VideoWriter` glue
+- GStreamer media `Writer` host BGR `jpegavi` and `x264mp4` video write/readback behavior
+- Pipeline video example now reads through `cvkit::media::Source` and writes through `cvkit::media::Writer` instead of example-local OpenCV video glue
+- Pipeline video writer smoke is scripted by `./scripts/probe_media_writer.sh`
+- Pipeline video writer smoke covers OpenCV writer and GStreamer `jpegavi` / `x264mp4`; `RUN_NVENC=1` enables the environment-dependent `nvh264` probe
 - YOLO11 TensorRT example on GPU 7:
   - `detections=2`
   - graph JSON exported to `assets/output/trt_yolo_graph.json`
@@ -102,10 +105,13 @@ Important limitations:
 - Tiled execution records aggregate/per-tile trace entries for both sync `run_sync(...)` and async `submit(...)`, and graph JSON version `6` exposes structured `tiling` / `tile_info` metadata.
 - Tiled execution does not yet record full internal task-graph node traces per tile.
 - GPU preprocess is still primarily detection-oriented.
+- `ImageValue` now has explicit NV12 layout validation for CUDA media frames.
+- Promptable-segmentation CUDA encoder preprocess now accepts CUDA NV12 input and converts it to RGB in the GPU resize/normalize kernel.
 - TensorRT smoke tests are opt-in where real GPU/runtime coverage is required.
 - Non-float32 execution is not generally supported even though metadata can describe richer dtypes.
 - OpenVINO and FFmpeg backend paths are reserved, not implemented.
 - Media `Writer` currently supports host BGR frames only; device-frame writing and GPU encode are explicit non-goals for the first writer pass.
+- GStreamer `nvh264` writer coverage is opt-in through `CVKIT_RUN_GSTREAMER_NVENC_SMOKE=1` because it depends on host driver/runtime state.
 
 ## Next Recommended Work
 
@@ -115,11 +121,11 @@ Highest-value next steps:
   - extend inspectable status beyond the current basic open/eof/error states where practical
   - keep media source lifetime outside the infer task graph
   - keep GStreamer optional and backend-gated
-  - keep writer API symmetric but avoid pretending GStreamer/FFmpeg/GPU encode are ready before implementation
+  - keep writer API symmetric but avoid pretending FFmpeg/GPU encode are ready before implementation
 - Add deeper host-first media coverage:
   - keep OpenCV image/video reader tests aligned with workspace assets
   - keep timestamp/fps/source/frame-index metadata coverage
-  - add basic writer API symmetry with reader options
+  - add broader writer coverage for codec/backend combinations that exist on the host
 - Advance GPU media path:
   - use `scripts/probe_media_gpu.sh` to validate NVDEC on the selected CUDA device
   - use `scripts/probe_video_gpu_detection.sh` to validate NVDEC `DeviceFrame` through TensorRT YOLO detection

@@ -1,5 +1,7 @@
 #include "promptable_preprocess_cuda_kernel.h"
 
+#include "../../utils/cuda_image_sampling.cuh"
+
 #include <cuda_runtime_api.h>
 
 #include <cmath>
@@ -56,6 +58,7 @@ namespace cvkit::infer::detail
             int                  src_width,
             int                  src_height,
             bool                 bgr_input,
+            bool                 nv12_input,
             float*               dst)
         {
             const int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -70,18 +73,37 @@ namespace cvkit::infer::detail
             const float src_y =
                 ((static_cast<float>(y) + 0.5F) * static_cast<float>(src_height) / static_cast<float>(kEncoderImageSize)) - 0.5F;
 
-            const float c0 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 0);
-            const float c1 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 1);
-            const float c2 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 2);
-
-            float r = c0;
-            float g = c1;
-            float b = c2;
-            if (bgr_input)
+            float r = 0.0F;
+            float g = 0.0F;
+            float b = 0.0F;
+            if (nv12_input)
             {
-                b = c0;
+                cvkit::infer::detail::cuda::sample_nv12_rgb_linear_u8_range(
+                    src,
+                    src_stride,
+                    src_width,
+                    src_height,
+                    src_x,
+                    src_y,
+                    r,
+                    g,
+                    b);
+            }
+            else
+            {
+                const float c0 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 0);
+                const float c1 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 1);
+                const float c2 = sample_channel_linear(src, src_stride, src_width, src_height, src_x, src_y, 2);
+
+                r = c0;
                 g = c1;
-                r = c2;
+                b = c2;
+                if (bgr_input)
+                {
+                    b = c0;
+                    g = c1;
+                    r = c2;
+                }
             }
 
             const auto plane_size = static_cast<std::size_t>(kEncoderImageSize) * static_cast<std::size_t>(kEncoderImageSize);
@@ -99,7 +121,8 @@ namespace cvkit::infer::detail
         bool                            prefer_device_tensor_output,
         RawTensor&                      tensor)
     {
-        if (!image.has_valid_device_view() || image.frame.desc.channels != 3)
+        const bool nv12_input = image.frame.desc.format == cvkit::core::PixelFormat::nv12;
+        if (!image.has_valid_device_view() || (!nv12_input && image.frame.desc.channels != 3))
         {
             return false;
         }
@@ -125,6 +148,7 @@ namespace cvkit::infer::detail
             image.frame.desc.width,
             image.frame.desc.height,
             bgr_input,
+            nv12_input,
             device_output);
 
         if (cudaGetLastError() != cudaSuccess)

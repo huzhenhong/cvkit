@@ -13,3 +13,4 @@ cmake_configure_release
 cmake_build_release
 ctest_release
 run_pipeline_image
+run_media_writer_probe

@@ -3,7 +3,6 @@
 #include "cvkit/media/options.h"
 
 #include <opencv2/core.hpp>
-#include <opencv2/videoio.hpp>
 
 #include <filesystem>
 
@@ -16,12 +15,5 @@ namespace cvkit::examples
         const std::filesystem::path& image_path,
         cvkit::media::ReaderBackend  reader_backend,
         cv::Mat&                     image);
-
-    [[nodiscard]] bool open_video_capture(
-        const std::filesystem::path& video_path,
-        cvkit::media::ReaderBackend  reader_backend,
-        cv::VideoCapture&            capture,
-        cv::Mat&                     first_frame,
-        double&                      fps);
 
 }  // namespace cvkit::examples

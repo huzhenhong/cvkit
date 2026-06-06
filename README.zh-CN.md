@@ -149,6 +149,18 @@ OUTPUT_IMAGE_PATH=/workspace/cvkit/assets/output/video_gpu_detection_frame0.jpg 
 
 这是 opt-in 的调试/导出路径，不是 GPU pipeline 里的隐式 fallback。
 
+验证通过 public pipeline example 写出 host 视频的路径：
+
+```bash
+./scripts/probe_media_writer.sh
+```
+
+这会覆盖 OpenCV writer 以及 GStreamer `jpegavi`、`x264mp4` writer。硬件 `nvh264` 编码依赖宿主机 driver/runtime 状态，因此需要显式开启：
+
+```bash
+RUN_NVENC=1 ./scripts/probe_media_writer.sh
+```
+
 - 默认模型路径：`assets/models/yolo11n.onnx`
 - example 生成的输出默认写到 `assets/output/`
 
@@ -219,6 +231,10 @@ cmake -S . -B build/conan/Release \
   - `build/compile_commands.json`
 - TensorRT 相关 smoke 仍然是显式启用：
   - `CVKIT_RUN_TENSORRT_SMOKE=1`
+- local CI 默认运行 media writer probe；可以这样关闭：
+  - `CVKIT_RUN_MEDIA_WRITER_PROBE=OFF`
+- 硬件 `nvh264` writer probe 仍然需要显式开启：
+  - `CVKIT_RUN_MEDIA_WRITER_NVENC_PROBE=1`
 
 常用环境变量覆盖项：
 
@@ -742,6 +758,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
 - YOLO11 图片推理链路正常
 - GStreamer 视频读取正常
 - GStreamer `jpegavi` 和 `x264mp4` 写出链路正常
+- GStreamer `nvh264` writer smoke 通过 `CVKIT_RUN_GSTREAMER_NVENC_SMOKE=1` 显式开启
 - `CVKIT_ENABLE_GSTREAMER_CUDA=ON` 的 configure / build 路径已经验证
 - TensorRT backend 的 load/run/cache 链路已经在第 7 张卡上验证通过
 - TensorRT serialized engine cache 已支持指纹命名和旧 cache 迁移
@@ -750,6 +767,7 @@ CVKIT_TRACE_GRAPH=1 CUDA_VISIBLE_DEVICES=7 \
 - task graph metadata 与每节点 timing trace 已可用
 - `cvkit::infer::Model::session_info()` 现在已能通过公共 API 暴露 backend tensor 输入/输出 metadata
 - `ImageValue` 和 `TensorValue` 现在都带有最小 device-aware contract metadata
+- `ImageValue` 现在会按完整 `Y + UV` 存储大小校验 CUDA NV12 media frame
 - examples 现在已经使用 `ImageValue` 作为主要图像输入对象
 - tensor session/debug metadata 现在会带出：
   - `data_type`

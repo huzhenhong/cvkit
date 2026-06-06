@@ -245,17 +245,19 @@ Current implemented reader behavior:
 - `ReaderBackend::ffmpeg` is reserved, not implemented yet
 - frame output is currently host-owned packed image data
 - device-frame output carries an opaque owner to keep the backend buffer/map alive while downstream code consumes the pointer
-- `Source::is_open()`, `Source::status()`, `Source::status_message()`, and `Source::info()` expose source state plus basic video metadata such as fps, frame count, and frame index
-- `cvkit::media::runtime_capabilities(cuda_device_index)` reports available GStreamer/CUDA decode elements without requiring the caller to shell out to `gst-inspect-1.0`
+- `Source::is_open()`, `Source::status()`, `Source::status_message()`, and `Source::info()` expose source state, requested output memory, CUDA device index, and basic video metadata such as fps, frame count, and frame index
+- `cvkit::media::runtime_capabilities(cuda_device_index)` reports available GStreamer decode/write/CUDA elements without requiring the caller to shell out to `gst-inspect-1.0`
 
 Current implemented writer behavior:
 
-- `Writer` supports host `cvkit::core::Frame` input through OpenCV
+- `Writer` supports host `cvkit::core::Frame` input through OpenCV and GStreamer pipeline backends
 - the first writer path requires packed BGR8 frame data with fixed width/height/fps from `WriterOptions`
 - `Writer::write(DeviceFrame&)` rejects device frames explicitly; GPU encode is not implemented yet
-- GStreamer and FFmpeg writer backends are reserved in the public options but currently rejected by `Writer`
-- `Writer::status()`, `Writer::status_message()`, and `Writer::info()` expose open/error/limit state plus written frame count
-- the pipeline example uses `cvkit::media::Writer` for host annotated video output; GStreamer/FFmpeg writer selections fail explicitly until those backends are implemented
+- GStreamer host writer supports `jpegavi`, `x264mp4`, and `nvh264` when the required local elements exist
+- automated writer tests cover `jpegavi` and `x264mp4`; `nvh264` is covered by an opt-in smoke test via `CVKIT_RUN_GSTREAMER_NVENC_SMOKE=1`
+- FFmpeg writer backend is reserved in the public options but currently rejected by `Writer`
+- `Writer::status()`, `Writer::status_message()`, and `Writer::info()` expose open/error/limit state plus backend, codec, dimensions, fps, and written frame count
+- the pipeline example uses `cvkit::media::Source` for host video input and `cvkit::media::Writer` for host annotated video output
 
 Media is intentionally not modeled as "create one graph node per frame". The preferred direction is:
 
@@ -267,7 +269,7 @@ Media is intentionally not modeled as "create one graph node per frame". The pre
 Near-term media work should focus on:
 
 - deterministic EOF/error reporting instead of only `bool`
-- basic writer API symmetry with reader options beyond the current OpenCV host-writer path
+- basic writer API symmetry with reader options beyond the current host-writer paths
 - video-file EOF, timestamp, fps, and frame-index coverage
 - optional GStreamer/CUDA decode path design without forcing it into the infer graph
 - keep `DeviceFrame` NV12 output wired through YOLO CUDA preprocess and TensorRT smoke coverage
@@ -622,6 +624,13 @@ Current helper semantics:
 - `has_valid_host_layout()`
 - `required_byte_size()`
 - `has_valid_device_view()`
+
+Layout contract:
+
+- packed BGR/RGB images use `width * channels` bytes per row unless `row_stride_bytes` is set
+- NV12 images use one byte per pixel for row stride and require `stride * height * 3 / 2` bytes for the combined Y and UV storage
+- CUDA `DeviceFrame` inputs are converted to external-view `ImageValue` objects without copying and keep the device-frame owner alive
+- promptable-segmentation CUDA encoder preprocess accepts CUDA BGR8/RGB8 and NV12 inputs; NV12 is converted to RGB in the resize/normalize kernel before producing encoder NCHW float input
 
 Current implementation status:
 

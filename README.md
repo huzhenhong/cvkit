@@ -149,6 +149,18 @@ OUTPUT_IMAGE_PATH=/workspace/cvkit/assets/output/video_gpu_detection_frame0.jpg 
 
 This is an opt-in debug/export path, not an implicit fallback in the GPU pipeline.
 
+To validate host video writer paths through the public pipeline example:
+
+```bash
+./scripts/probe_media_writer.sh
+```
+
+This covers OpenCV writer plus GStreamer `jpegavi` and `x264mp4` writer probes. Hardware `nvh264` encoding is intentionally opt-in because it depends on the host driver/runtime state:
+
+```bash
+RUN_NVENC=1 ./scripts/probe_media_writer.sh
+```
+
 - default model path: `assets/models/yolo11n.onnx`
 - generated example outputs go to `assets/output/`
 
@@ -219,6 +231,10 @@ Current script behavior notes:
   - `build/compile_commands.json`
 - TensorRT-specific smoke tests remain opt-in and still require:
   - `CVKIT_RUN_TENSORRT_SMOKE=1`
+- local CI runs the media writer probe by default; disable with:
+  - `CVKIT_RUN_MEDIA_WRITER_PROBE=OFF`
+- hardware `nvh264` writer probing remains opt-in:
+  - `CVKIT_RUN_MEDIA_WRITER_NVENC_PROBE=1`
 
 Useful environment overrides:
 
@@ -742,6 +758,7 @@ Verified locally:
 - YOLO11 image inference path works
 - GStreamer video read path works
 - GStreamer `jpegavi` and `x264mp4` write paths work
+- GStreamer `nvh264` writer smoke is opt-in with `CVKIT_RUN_GSTREAMER_NVENC_SMOKE=1`
 - `CVKIT_ENABLE_GSTREAMER_CUDA=ON` configure/build path has been validated
 - TensorRT backend load/run/cache path has been validated on GPU 7
 - TensorRT serialized engine cache supports fingerprinted cache files and legacy cache migration
@@ -750,6 +767,7 @@ Verified locally:
 - task graph metadata and per-node timing trace are available
 - `cvkit::infer::Model::session_info()` now exposes backend tensor input/output metadata through the public API
 - `ImageValue` and `TensorValue` now carry minimal device-aware contract metadata
+- `ImageValue` validates CUDA NV12 media frames using the full `Y + UV` storage size
 - examples now use `ImageValue` as the primary image input object
 - tensor session/debug metadata now includes:
   - `data_type`

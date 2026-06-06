@@ -76,6 +76,41 @@ namespace cvkit::media
             return cv::VideoWriter::fourcc('m', 'p', '4', 'v');
         }
 
+        [[nodiscard]] std::string escape_path_for_gstreamer(const std::filesystem::path& path)
+        {
+            auto        location = std::filesystem::absolute(path).string();
+            std::size_t offset   = 0;
+            while ((offset = location.find('\\', offset)) != std::string::npos)
+            {
+                location.replace(offset, 1, "\\\\");
+                offset += 2;
+            }
+            offset = 0;
+            while ((offset = location.find('"', offset)) != std::string::npos)
+            {
+                location.replace(offset, 1, "\\\"");
+                offset += 2;
+            }
+            return location;
+        }
+
+        [[nodiscard]] std::string gstreamer_writer_pipeline(const WriterOptions& options)
+        {
+            const auto location = escape_path_for_gstreamer(options.uri);
+
+            if (options.gst_codec == GstVideoCodec::x264mp4)
+            {
+                return "appsrc ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
+            }
+
+            if (options.gst_codec == GstVideoCodec::nvh264)
+            {
+                return "appsrc ! videoconvert ! nvh264enc ! h264parse ! mp4mux ! filesink location=\"" + location + "\"";
+            }
+
+            return "appsrc ! videoconvert ! jpegenc ! avimux ! filesink location=\"" + location + "\"";
+        }
+
     }  // namespace
 
     class Writer::Impl
@@ -95,28 +130,47 @@ namespace cvkit::media
                 return false;
             }
 
-            if (options.backend == WriterBackend::ffmpeg || options.backend == WriterBackend::gstreamer)
+            if (options.backend == WriterBackend::ffmpeg)
             {
-                set_status(WriterStatus::unsupported_backend, "only opencv writer is implemented");
+                set_status(WriterStatus::unsupported_backend, "ffmpeg writer is not implemented");
                 return false;
             }
 
-            if (options.backend != WriterBackend::opencv)
+            if (options.backend == WriterBackend::opencv)
+            {
+                const auto fourcc = opencv_fourcc_for_uri(options.uri);
+                writer_.open(options.uri, fourcc, options.fps, cv::Size(options.width, options.height), true);
+            }
+            else if (options.backend == WriterBackend::gstreamer)
+            {
+                if (options.gst_codec == GstVideoCodec::nvv4l2h264)
+                {
+                    set_status(WriterStatus::unsupported_backend, "nvv4l2h264 writer is not available on this platform");
+                    return false;
+                }
+                writer_.open(
+                    gstreamer_writer_pipeline(options),
+                    cv::CAP_GSTREAMER,
+                    0,
+                    options.fps,
+                    cv::Size(options.width, options.height),
+                    true);
+            }
+            else
             {
                 set_status(WriterStatus::unsupported_backend);
                 return false;
             }
 
-            const auto fourcc = opencv_fourcc_for_uri(options.uri);
-            writer_.open(options.uri, fourcc, options.fps, cv::Size(options.width, options.height), true);
             if (!writer_.isOpened())
             {
-                set_status(WriterStatus::backend_error, "opencv failed to open writer");
+                set_status(WriterStatus::backend_error, "backend failed to open writer");
                 return false;
             }
 
             info_.uri        = std::move(options.uri);
             info_.backend    = options.backend;
+            info_.gst_codec  = options.gst_codec;
             info_.open       = true;
             info_.width      = options.width;
             info_.height     = options.height;

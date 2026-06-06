@@ -152,3 +152,31 @@ run_pipeline_image() {
         --image "${image}" \
         --output-dir "${output_dir}"
 }
+
+run_media_writer_probe() {
+    local script="${CVKIT_DIR}/scripts/probe_media_writer.sh"
+    local binary="${CVKIT_DIR}/build/conan/Release/examples/bin/cvkit_example_pipeline"
+    local model="${CVKIT_DIR}/assets/models/yolo11n.onnx"
+    local labels="${CVKIT_DIR}/assets/labels/coco80.txt"
+    local video="${CVKIT_DIR}/assets/video/test.mp4"
+
+    if [[ "${CVKIT_RUN_MEDIA_WRITER_PROBE:-ON}" != "ON" ]]; then
+        echo "Skipping media writer probe: CVKIT_RUN_MEDIA_WRITER_PROBE=${CVKIT_RUN_MEDIA_WRITER_PROBE:-}"
+        return
+    fi
+
+    if [[ ! -x "${script}" || ! -x "${binary}" || ! -f "${model}" || ! -f "${labels}" || ! -f "${video}" ]]; then
+        echo "Skipping media writer probe: script, binary, or assets missing"
+        return
+    fi
+
+    print_section "cvkit media writer probe"
+    BUILD_DIR="${CVKIT_DIR}/build/conan/Release" \
+        VIDEO_PATH="${video}" \
+        MODEL_PATH="${model}" \
+        LABELS_PATH="${labels}" \
+        OUTPUT_DIR="${CVKIT_DIR}/assets/output" \
+        MAX_FRAMES="${CVKIT_MEDIA_WRITER_PROBE_MAX_FRAMES:-2}" \
+        RUN_NVENC="${CVKIT_RUN_MEDIA_WRITER_NVENC_PROBE:-0}" \
+        "${script}"
+}

@@ -4,15 +4,17 @@
 #include "example_opencv_utils.h"
 #include "pipeline_media_utils.h"
 #include "cvkit/core/types.h"
+#include "cvkit/media/source.h"
 #include "cvkit/media/writer.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/videoio.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace cvkit::examples
@@ -104,6 +106,22 @@ namespace cvkit::examples
                     1,
                     cv::LINE_AA);
             }
+        }
+
+        [[nodiscard]] cv::Mat frame_to_mat(const cvkit::core::Frame& frame)
+        {
+            if (frame.desc.width <= 0 || frame.desc.height <= 0 || frame.desc.channels != 3 ||
+                frame.desc.format != cvkit::core::PixelFormat::bgr8 || frame.data.empty())
+            {
+                return {};
+            }
+
+            return cv::Mat(
+                       frame.desc.height,
+                       frame.desc.width,
+                       CV_8UC3,
+                       const_cast<std::uint8_t*>(frame.data.data()))
+                .clone();
         }
     }  // namespace
 
@@ -216,22 +234,44 @@ namespace cvkit::examples
             cvkit::examples::print_graph_info(std::cout, model);
         }
 
-        cv::Mat          first_frame;
-        cv::VideoCapture capture;
-        double           fps = 25.0;
-        if (!open_video_capture(video_path, reader_backend, capture, first_frame, fps))
+        cvkit::media::SourceOptions source_options{};
+        source_options.uri     = video_path.string();
+        source_options.backend = reader_backend;
+
+        cvkit::media::Source source;
+        if (!source.open(std::move(source_options)))
         {
+            std::cerr << "failed to open video source: " << source.status_message() << '\n';
             return 1;
         }
 
-        static_cast<void>(gst_codec);
+        cvkit::core::Frame first_source_frame{};
+        if (!source.read(first_source_frame))
+        {
+            std::cerr << "failed to read first video frame: " << source.status_message() << '\n';
+            return 1;
+        }
+
+        auto first_frame = frame_to_mat(first_source_frame);
+        if (first_frame.empty())
+        {
+            std::cerr << "failed to convert first video frame to BGR image\n";
+            return 1;
+        }
+
+        const auto source_info = source.info();
+        const auto fps         = std::max(1.0, source_info.fps);
 
         const auto            output_root = ensure_output_dir(output_dir);
-        const auto            output_path = output_root / (video_path.stem().string() + "_det.avi");
+        const bool            mp4_output  = writer_backend == cvkit::media::WriterBackend::gstreamer &&
+                                 (gst_codec == cvkit::media::GstVideoCodec::x264mp4 ||
+                                  gst_codec == cvkit::media::GstVideoCodec::nvh264);
+        const auto            output_path = output_root / (video_path.stem().string() + (mp4_output ? "_det.mp4" : "_det.avi"));
         cvkit::media::Writer  writer;
         cvkit::media::WriterOptions writer_options{};
         writer_options.uri     = output_path.string();
         writer_options.backend = writer_backend;
+        writer_options.gst_codec = gst_codec;
         writer_options.width   = first_frame.cols;
         writer_options.height  = first_frame.rows;
         writer_options.fps     = fps;
@@ -245,6 +285,7 @@ namespace cvkit::examples
         std::size_t total_detections = 0;
         cv::Mat     frame            = first_frame;
         bool        has_frame        = !frame.empty();
+        cvkit::core::Frame source_frame = std::move(first_source_frame);
         do
         {
             auto detections = infer_detections(model, mat_to_image_value(frame, video_path.string()), async_infer);
@@ -270,7 +311,13 @@ namespace cvkit::examples
                 break;
             }
 
-            has_frame = capture.read(frame) && !frame.empty();
+            source_frame = {};
+            has_frame    = source.read(source_frame);
+            if (has_frame)
+            {
+                frame = frame_to_mat(source_frame);
+                has_frame = !frame.empty();
+            }
         } while (has_frame);
 
         std::cout

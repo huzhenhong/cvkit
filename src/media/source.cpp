@@ -308,12 +308,14 @@ namespace cvkit::media
         bool open(SourceOptions options)
         {
             close();
-            backend_      = options.backend;
-            output_memory_ = options.output_memory;
+            backend_           = options.backend;
+            output_memory_     = options.output_memory;
             cuda_device_index_ = options.cuda_device_index;
-            uri_          = std::move(options.uri);
-            info_.uri = uri_;
-            info_.backend = backend_;
+            uri_               = std::move(options.uri);
+            info_.uri               = uri_;
+            info_.backend           = backend_;
+            info_.output_memory     = output_memory_;
+            info_.cuda_device_index = cuda_device_index_;
             if (uri_.empty())
             {
                 set_status(SourceStatus::invalid_uri);
@@ -420,6 +422,10 @@ namespace cvkit::media
             {
                 sample  = gst_app_sink_try_pull_preroll(sink_, 15 * GST_SECOND);
                 primed_ = true;
+                if (sample == nullptr)
+                {
+                    sample = gst_app_sink_try_pull_sample(sink_, 15 * GST_SECOND);
+                }
             }
             else
             {
@@ -499,6 +505,10 @@ namespace cvkit::media
             {
                 sample  = gst_app_sink_try_pull_preroll(sink_, 15 * GST_SECOND);
                 primed_ = true;
+                if (sample == nullptr)
+                {
+                    sample = gst_app_sink_try_pull_sample(sink_, 15 * GST_SECOND);
+                }
             }
             else
             {
@@ -811,6 +821,13 @@ namespace cvkit::media
         capabilities.gstreamer_cudaupload = has_element_factory("cudaupload");
         capabilities.gstreamer_cudadownload = has_element_factory("cudadownload");
         capabilities.gstreamer_cuda_convert = has_element_factory("cudaconvert");
+        capabilities.gstreamer_appsrc = has_element_factory("appsrc");
+        capabilities.gstreamer_videoconvert = has_element_factory("videoconvert");
+        capabilities.gstreamer_jpegenc = has_element_factory("jpegenc");
+        capabilities.gstreamer_avimux = has_element_factory("avimux");
+        capabilities.gstreamer_x264enc = has_element_factory("x264enc");
+        capabilities.gstreamer_mp4mux = has_element_factory("mp4mux");
+        capabilities.gstreamer_nvh264enc = has_element_factory("nvh264enc");
 
         if (cuda_device_index >= 0)
         {

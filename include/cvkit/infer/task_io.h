@@ -50,6 +50,10 @@ namespace cvkit::infer
 
         [[nodiscard]] std::size_t bytes_per_pixel() const
         {
+            if (frame.desc.format == cvkit::core::PixelFormat::nv12)
+            {
+                return 1U;
+            }
             return frame.desc.channels > 0 ? static_cast<std::size_t>(frame.desc.channels) : 0U;
         }
 
@@ -74,7 +78,17 @@ namespace cvkit::infer
             {
                 return 0U;
             }
-            return effective_row_stride_bytes() * static_cast<std::size_t>(frame.desc.height);
+            const auto row_stride = effective_row_stride_bytes();
+            if (row_stride == 0U)
+            {
+                return 0U;
+            }
+            const auto height = static_cast<std::size_t>(frame.desc.height);
+            if (frame.desc.format == cvkit::core::PixelFormat::nv12)
+            {
+                return row_stride * height * 3U / 2U;
+            }
+            return row_stride * height;
         }
 
         [[nodiscard]] bool has_valid_host_layout() const

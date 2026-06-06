@@ -4,6 +4,7 @@
 #include "cvkit/media/writer.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -53,6 +54,8 @@ TEST_CASE("opencv media source reads image file as host bgr frame")
     const auto opened_info = source.info();
     CHECK(opened_info.open);
     CHECK(opened_info.backend == cvkit::media::ReaderBackend::opencv);
+    CHECK(opened_info.output_memory == cvkit::media::SourceMemory::host);
+    CHECK(opened_info.cuda_device_index == 0);
     CHECK(opened_info.width == 2048);
     CHECK(opened_info.height == 1150);
 
@@ -121,6 +124,7 @@ TEST_CASE("opencv media source reads video file with metadata")
 
     const auto opened_info = source.info();
     CHECK(opened_info.open);
+    CHECK(opened_info.output_memory == cvkit::media::SourceMemory::host);
     CHECK(opened_info.width > 0);
     CHECK(opened_info.height > 0);
     CHECK(opened_info.channels == 3);
@@ -162,14 +166,21 @@ TEST_CASE("media runtime reports gstreamer cuda decode capabilities")
     }
 
     CHECK(capabilities.gstreamer_appsink);
+    CHECK(capabilities.gstreamer_appsrc);
     CHECK(capabilities.gstreamer_decodebin);
     CHECK(capabilities.gstreamer_h264parse);
+    CHECK(capabilities.gstreamer_videoconvert);
 
     INFO("nvh264dec=" << capabilities.gstreamer_nvh264dec
                       << " nvh264device7dec=" << capabilities.gstreamer_nvh264_device_decoder
                       << " cudaupload=" << capabilities.gstreamer_cudaupload
                       << " cudadownload=" << capabilities.gstreamer_cudadownload
-                      << " cudaconvert=" << capabilities.gstreamer_cuda_convert);
+                      << " cudaconvert=" << capabilities.gstreamer_cuda_convert
+                      << " jpegenc=" << capabilities.gstreamer_jpegenc
+                      << " avimux=" << capabilities.gstreamer_avimux
+                      << " x264enc=" << capabilities.gstreamer_x264enc
+                      << " mp4mux=" << capabilities.gstreamer_mp4mux
+                      << " nvh264enc=" << capabilities.gstreamer_nvh264enc);
 }
 
 TEST_CASE("gstreamer media source reads h264 video as cuda device frame")
@@ -199,6 +210,9 @@ TEST_CASE("gstreamer media source reads h264 video as cuda device frame")
         INFO(source.status_message());
         SKIP("GStreamer CUDA source did not open in this environment");
     }
+    CHECK(source.info().backend == cvkit::media::ReaderBackend::gstreamer);
+    CHECK(source.info().output_memory == cvkit::media::SourceMemory::cuda);
+    CHECK(source.info().cuda_device_index == 7);
 
     cvkit::core::Frame host_frame{};
     CHECK_FALSE(source.read(host_frame));
@@ -216,6 +230,8 @@ TEST_CASE("gstreamer media source reads h264 video as cuda device frame")
     CHECK(frame.stride_bytes > 0);
     CHECK(frame.device_index == 7);
     CHECK(frame.source == video_path.string());
+    CHECK(source.info().output_memory == cvkit::media::SourceMemory::cuda);
+    CHECK(source.info().cuda_device_index == 7);
 }
 
 TEST_CASE("opencv media writer writes host bgr frames")
@@ -238,6 +254,8 @@ TEST_CASE("opencv media writer writes host bgr frames")
     REQUIRE(writer.open(std::move(options)));
     CHECK(writer.is_open());
     CHECK(writer.status() == cvkit::media::WriterStatus::open);
+    CHECK(writer.info().backend == cvkit::media::WriterBackend::opencv);
+    CHECK(writer.info().gst_codec == cvkit::media::GstVideoCodec::jpegavi);
 
     cvkit::core::Frame frame{};
     frame.desc.width    = 64;
@@ -279,7 +297,7 @@ TEST_CASE("media writer rejects unsupported and device-frame paths explicitly")
 
     cvkit::media::WriterOptions options{};
     options.uri     = output_path.string();
-    options.backend = cvkit::media::WriterBackend::gstreamer;
+    options.backend = cvkit::media::WriterBackend::ffmpeg;
     options.width   = 64;
     options.height  = 48;
     options.fps     = 25.0;
@@ -295,6 +313,7 @@ TEST_CASE("media writer rejects unsupported and device-frame paths explicitly")
     host_options.height  = 48;
     host_options.fps     = 25.0;
     REQUIRE(writer.open(std::move(host_options)));
+    CHECK(writer.info().backend == cvkit::media::WriterBackend::opencv);
 
     cvkit::core::DeviceFrame frame{};
     frame.desc.width    = 64;
@@ -304,4 +323,192 @@ TEST_CASE("media writer rejects unsupported and device-frame paths explicitly")
     frame.memory_device = cvkit::core::MemoryDevice::cuda;
     CHECK_FALSE(writer.write(frame));
     CHECK(writer.status() == cvkit::media::WriterStatus::unsupported_backend);
+}
+
+TEST_CASE("gstreamer media writer writes host bgr frames")
+{
+    const auto capabilities = cvkit::media::runtime_capabilities(0);
+    if (!capabilities.gstreamer ||
+        !capabilities.gstreamer_appsrc ||
+        !capabilities.gstreamer_videoconvert ||
+        !capabilities.gstreamer_jpegenc ||
+        !capabilities.gstreamer_avimux)
+    {
+        SKIP("GStreamer jpegavi writer support is not available in this build");
+    }
+
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto output_dir  = source_root / "assets" / "output";
+    std::filesystem::create_directories(output_dir);
+    const auto output_path = output_dir / "test_media_writer_gst.avi";
+    std::filesystem::remove(output_path);
+
+    cvkit::media::WriterOptions options{};
+    options.uri        = output_path.string();
+    options.backend    = cvkit::media::WriterBackend::gstreamer;
+    options.gst_codec  = cvkit::media::GstVideoCodec::jpegavi;
+    options.width      = 64;
+    options.height     = 48;
+    options.fps        = 12.0;
+    options.max_frames = 2;
+
+    cvkit::media::Writer writer;
+    if (!writer.open(std::move(options)))
+    {
+        INFO(writer.status_message());
+        SKIP("GStreamer writer did not open in this environment");
+    }
+    CHECK(writer.info().backend == cvkit::media::WriterBackend::gstreamer);
+    CHECK(writer.info().gst_codec == cvkit::media::GstVideoCodec::jpegavi);
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 48;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 90U);
+    REQUIRE(writer.write(frame));
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 160U);
+    REQUIRE(writer.write(frame));
+    CHECK(writer.info().frame_count == 2);
+    writer.close();
+
+    REQUIRE(std::filesystem::exists(output_path));
+    cvkit::media::Source source;
+    REQUIRE(source.open(output_path.string()));
+    cvkit::core::Frame decoded{};
+    REQUIRE(source.read(decoded));
+    CHECK(decoded.desc.width == 64);
+    CHECK(decoded.desc.height == 48);
+    CHECK(decoded.desc.channels == 3);
+}
+
+TEST_CASE("gstreamer media writer writes x264 mp4 when elements are available")
+{
+    const auto capabilities = cvkit::media::runtime_capabilities(0);
+    if (!capabilities.gstreamer ||
+        !capabilities.gstreamer_appsrc ||
+        !capabilities.gstreamer_videoconvert ||
+        !capabilities.gstreamer_x264enc ||
+        !capabilities.gstreamer_h264parse ||
+        !capabilities.gstreamer_mp4mux)
+    {
+        SKIP("GStreamer x264mp4 writer support is not available in this build");
+    }
+
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto output_dir  = source_root / "assets" / "output";
+    std::filesystem::create_directories(output_dir);
+    const auto output_path = output_dir / "test_media_writer_gst_x264.mp4";
+    std::filesystem::remove(output_path);
+
+    cvkit::media::WriterOptions options{};
+    options.uri        = output_path.string();
+    options.backend    = cvkit::media::WriterBackend::gstreamer;
+    options.gst_codec  = cvkit::media::GstVideoCodec::x264mp4;
+    options.width      = 64;
+    options.height     = 48;
+    options.fps        = 12.0;
+    options.max_frames = 2;
+
+    cvkit::media::Writer writer;
+    if (!writer.open(std::move(options)))
+    {
+        INFO(writer.status_message());
+        SKIP("GStreamer x264 writer did not open in this environment");
+    }
+    CHECK(writer.info().backend == cvkit::media::WriterBackend::gstreamer);
+    CHECK(writer.info().gst_codec == cvkit::media::GstVideoCodec::x264mp4);
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 48;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 80U);
+    REQUIRE(writer.write(frame));
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 170U);
+    REQUIRE(writer.write(frame));
+    writer.close();
+
+    REQUIRE(std::filesystem::exists(output_path));
+    cvkit::media::Source source;
+    REQUIRE(source.open(output_path.string()));
+    cvkit::core::Frame decoded{};
+    REQUIRE(source.read(decoded));
+    CHECK(decoded.desc.width == 64);
+    CHECK(decoded.desc.height == 48);
+    CHECK(decoded.desc.channels == 3);
+}
+
+TEST_CASE("gstreamer media writer nvenc smoke is opt-in")
+{
+    if (std::getenv("CVKIT_RUN_GSTREAMER_NVENC_SMOKE") == nullptr)
+    {
+        SKIP("Set CVKIT_RUN_GSTREAMER_NVENC_SMOKE=1 to run the environment-dependent NVENC writer smoke");
+    }
+
+    const auto capabilities = cvkit::media::runtime_capabilities(0);
+    if (!capabilities.gstreamer ||
+        !capabilities.gstreamer_appsrc ||
+        !capabilities.gstreamer_videoconvert ||
+        !capabilities.gstreamer_nvh264enc ||
+        !capabilities.gstreamer_h264parse ||
+        !capabilities.gstreamer_mp4mux)
+    {
+        SKIP("GStreamer nvh264 writer support is not available in this environment");
+    }
+
+    const auto source_root = std::filesystem::path(__FILE__).parent_path().parent_path();
+    const auto output_dir  = source_root / "assets" / "output";
+    std::filesystem::create_directories(output_dir);
+    const auto output_path = output_dir / "test_media_writer_gst_nvh264.mp4";
+    std::filesystem::remove(output_path);
+
+    cvkit::media::WriterOptions options{};
+    options.uri        = output_path.string();
+    options.backend    = cvkit::media::WriterBackend::gstreamer;
+    options.gst_codec  = cvkit::media::GstVideoCodec::nvh264;
+    options.width      = 64;
+    options.height     = 48;
+    options.fps        = 12.0;
+    options.max_frames = 1;
+
+    cvkit::media::Writer writer;
+    if (!writer.open(std::move(options)))
+    {
+        INFO(writer.status_message());
+        SKIP("GStreamer NVENC writer did not open in this environment");
+    }
+    CHECK(writer.info().gst_codec == cvkit::media::GstVideoCodec::nvh264);
+
+    cvkit::core::Frame frame{};
+    frame.desc.width    = 64;
+    frame.desc.height   = 48;
+    frame.desc.channels = 3;
+    frame.desc.format   = cvkit::core::PixelFormat::bgr8;
+    frame.data.assign(static_cast<std::size_t>(64 * 48 * 3), 120U);
+    REQUIRE(writer.write(frame));
+    writer.close();
+
+    if (!std::filesystem::exists(output_path) || std::filesystem::file_size(output_path) == 0)
+    {
+        SKIP("GStreamer NVENC writer produced no readable output in this environment");
+    }
+
+    cvkit::media::Source source;
+    if (!source.open(output_path.string()))
+    {
+        INFO(source.status_message());
+        SKIP("GStreamer NVENC writer output could not be opened in this environment");
+    }
+    cvkit::core::Frame decoded{};
+    if (!source.read(decoded))
+    {
+        INFO(source.status_message());
+        SKIP("GStreamer NVENC writer output could not be decoded in this environment");
+    }
+    CHECK(decoded.desc.width == 64);
+    CHECK(decoded.desc.height == 48);
+    CHECK(decoded.desc.channels == 3);
 }

@@ -13,6 +13,7 @@
 #include "cvkit/media/writer.h"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +60,19 @@ int main()
                  device_image.device.index == 0 &&
                  device_image.frame.desc.format == cvkit::core::PixelFormat::nv12 &&
                  !device_image.has_valid_device_view()))
+    {
+        return 1;
+    }
+
+    auto device_owner = std::make_shared<int>(1);
+    device_frame.data = 0x1000U;
+    device_frame.bytes = 4U * 4U * 3U / 2U;
+    device_frame.stride_bytes = 4U;
+    device_frame.owner = device_owner;
+    device_image = cvkit::infer::image_value_from_device_frame(device_frame);
+    if (!require(device_image.required_byte_size() == 24U &&
+                 device_image.has_valid_device_view() &&
+                 device_image.storage_owner == device_owner))
     {
         return 1;
     }
@@ -164,7 +178,9 @@ int main()
     if (!require(!source.is_open() &&
                  source.status() == cvkit::media::SourceStatus::invalid_uri &&
                  !source.status_message().empty() &&
-                 !source.info().open))
+                 !source.info().open &&
+                 source.info().output_memory == cvkit::media::SourceMemory::host &&
+                 source.info().cuda_device_index == 0))
     {
         return 1;
     }
@@ -178,6 +194,7 @@ int main()
     cvkit::media::WriterOptions writer_options{};
     writer_options.uri     = {};
     writer_options.backend = cvkit::media::WriterBackend::opencv;
+    writer_options.gst_codec = cvkit::media::GstVideoCodec::jpegavi;
     writer_options.width   = 4;
     writer_options.height  = 4;
     writer_options.fps     = 25.0;
@@ -186,7 +203,8 @@ int main()
     if (!require(!writer.open(writer_options) &&
                  writer.status() == cvkit::media::WriterStatus::invalid_options &&
                  !writer.status_message().empty() &&
-                 !writer.info().open))
+                 !writer.info().open &&
+                 writer.info().gst_codec == cvkit::media::GstVideoCodec::jpegavi))
     {
         return 1;
     }

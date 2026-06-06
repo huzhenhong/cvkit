@@ -53,6 +53,23 @@ namespace cvkit::infer::detail
         host_frame.data.resize(image.required_byte_size());
 
         const auto stride = image.effective_row_stride_bytes();
+        if (image.frame.desc.format == cvkit::core::PixelFormat::nv12)
+        {
+            if (cudaMemcpy(
+                    host_frame.data.data(),
+                    image.external_data,
+                    host_frame.data.size(),
+                    cudaMemcpyDeviceToHost) != cudaSuccess)
+            {
+                if (error_message != nullptr)
+                {
+                    *error_message = "failed to copy cuda nv12 image to host";
+                }
+                return std::nullopt;
+            }
+            return host_frame;
+        }
+
         if (cudaMemcpy2D(
                 host_frame.data.data(),
                 stride,

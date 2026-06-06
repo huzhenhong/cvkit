@@ -27,6 +27,8 @@ namespace cvkit::media
     {
         std::string                 uri{};
         ReaderBackend               backend{ReaderBackend::opencv};
+        SourceMemory                output_memory{SourceMemory::host};
+        int                         cuda_device_index{0};
         bool                        open{false};
         int                         width{0};
         int                         height{0};
@@ -49,6 +51,13 @@ namespace cvkit::media
         bool gstreamer_cudaupload{false};
         bool gstreamer_cudadownload{false};
         bool gstreamer_cuda_convert{false};
+        bool gstreamer_appsrc{false};
+        bool gstreamer_videoconvert{false};
+        bool gstreamer_jpegenc{false};
+        bool gstreamer_avimux{false};
+        bool gstreamer_x264enc{false};
+        bool gstreamer_mp4mux{false};
+        bool gstreamer_nvh264enc{false};
     };
 
     BK_MEDIA_EXPORT RuntimeCapabilities runtime_capabilities(int cuda_device_index = 0);

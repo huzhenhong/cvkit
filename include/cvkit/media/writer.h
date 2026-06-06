@@ -27,6 +27,7 @@ namespace cvkit::media
     {
         std::string   uri{};
         WriterBackend backend{WriterBackend::opencv};
+        GstVideoCodec gst_codec{GstVideoCodec::jpegavi};
         bool          open{false};
         int           width{0};
         int           height{0};
